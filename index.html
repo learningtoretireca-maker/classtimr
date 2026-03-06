@@ -91,14 +91,20 @@
             </button>
         </div>
 
-        <div class="flex flex-col items-center md:w-2/4">
-            <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Quick Start</span>
-            <div class="flex space-x-2">
-                <button onclick="setPreset(1)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">1 Min</button>
-                <button onclick="setPreset(5)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">5 Min</button>
-                <button onclick="setPreset(10)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">10 Min</button>
-                <button onclick="setPreset(15)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">15 Min</button>
-                <button onclick="showCustomTimeModal()" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">Custom</button>
+        <div class="flex flex-col items-center md:w-2/4 space-y-2">
+            <div class="flex bg-gray-800/80 border border-gray-600 rounded-lg p-0.5">
+                <button id="btn-mode-timer" onclick="switchMode('timer')" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-purple-600 text-white">Timer</button>
+                <button id="btn-mode-stopwatch" onclick="switchMode('stopwatch')" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Stopwatch</button>
+            </div>
+            <div id="quick-start-section" class="flex flex-col items-center">
+                <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Quick Start</span>
+                <div class="flex space-x-2">
+                    <button onclick="setPreset(1)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">1 Min</button>
+                    <button onclick="setPreset(5)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">5 Min</button>
+                    <button onclick="setPreset(10)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">10 Min</button>
+                    <button onclick="setPreset(15)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">15 Min</button>
+                    <button onclick="showCustomTimeModal()" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">Custom</button>
+                </div>
             </div>
         </div>
 
@@ -152,6 +158,8 @@
         let initialTime = timeRemaining;
         let timerInterval = null;
         let isRunning = false;
+        let isStopwatchMode = false;
+        let elapsedTime = 0;
 
         const timeDisplay = document.getElementById('time-display');
         const iconPlay = document.getElementById('icon-play');
@@ -159,25 +167,27 @@
         const btnPlay = document.getElementById('btn-play');
 
         function updateDisplay() {
-            let minutes = Math.floor(timeRemaining / 60);
-            let seconds = timeRemaining % 60;
+            let t = isStopwatchMode ? elapsedTime : timeRemaining;
+            let minutes = Math.floor(t / 60);
+            let seconds = t % 60;
             let formattedTime = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
             timeDisplay.textContent = formattedTime;
             document.title = `${formattedTime} - ClassTimr`;
 
-            if (timeRemaining <= 10 && timeRemaining > 0) {
-                timeDisplay.classList.add('text-red-400');
-            } else {
-                timeDisplay.classList.remove('text-red-400');
-            }
-
-            if (timeRemaining > 0) {
-                timeDisplay.classList.remove('timer-zero');
+            if (!isStopwatchMode) {
+                if (timeRemaining <= 10 && timeRemaining > 0) {
+                    timeDisplay.classList.add('text-red-400');
+                } else {
+                    timeDisplay.classList.remove('text-red-400');
+                }
+                if (timeRemaining > 0) {
+                    timeDisplay.classList.remove('timer-zero');
+                }
             }
         }
 
         function togglePlayPause() {
-            if (timeRemaining <= 0) {
+            if (!isStopwatchMode && timeRemaining <= 0) {
                 timeRemaining = initialTime;
                 updateDisplay();
                 timeDisplay.classList.remove('timer-zero');
@@ -197,23 +207,30 @@
                     playCurrentTrack();
                 }
 
-                timerInterval = setInterval(() => {
-                    if (timeRemaining > 0) {
-                        timeRemaining--;
+                if (isStopwatchMode) {
+                    timerInterval = setInterval(() => {
+                        elapsedTime++;
                         updateDisplay();
-                    } else {
-                        clearInterval(timerInterval);
-                        isRunning = false;
-                        iconPlay.classList.remove('hidden');
-                        iconPause.classList.add('hidden');
-                        btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
-                        btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
-                        if (typeof bgAudio !== 'undefined') bgAudio.pause();
-                        timeDisplay.classList.add('timer-zero');
-                        document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
-                        setTimeout(() => document.body.style.backgroundColor = "#000", 400);
-                    }
-                }, 1000);
+                    }, 1000);
+                } else {
+                    timerInterval = setInterval(() => {
+                        if (timeRemaining > 0) {
+                            timeRemaining--;
+                            updateDisplay();
+                        } else {
+                            clearInterval(timerInterval);
+                            isRunning = false;
+                            iconPlay.classList.remove('hidden');
+                            iconPause.classList.add('hidden');
+                            btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
+                            btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
+                            if (typeof bgAudio !== 'undefined') bgAudio.pause();
+                            timeDisplay.classList.add('timer-zero');
+                            document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
+                            setTimeout(() => document.body.style.backgroundColor = "#000", 400);
+                        }
+                    }, 1000);
+                }
                 iconPlay.classList.add('hidden');
                 iconPause.classList.remove('hidden');
                 btnPlay.classList.remove('bg-purple-600', 'hover:bg-purple-500');
@@ -225,15 +242,43 @@
         function resetTimer() {
             clearInterval(timerInterval);
             isRunning = false;
-            timeRemaining = initialTime;
+            if (isStopwatchMode) {
+                elapsedTime = 0;
+            } else {
+                timeRemaining = initialTime;
+            }
             iconPlay.classList.remove('hidden');
             iconPause.classList.add('hidden');
             btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
             btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
             if (typeof bgAudio !== 'undefined') bgAudio.pause();
             timeDisplay.classList.remove('timer-zero');
+            timeDisplay.classList.remove('text-red-400');
             document.body.style.backgroundColor = "#000";
             updateDisplay();
+        }
+
+        function switchMode(mode) {
+            const newIsStopwatch = (mode === 'stopwatch');
+            if (newIsStopwatch === isStopwatchMode) return;
+            isStopwatchMode = newIsStopwatch;
+            resetTimer();
+            const btnTimer = document.getElementById('btn-mode-timer');
+            const btnStopwatch = document.getElementById('btn-mode-stopwatch');
+            const quickStart = document.getElementById('quick-start-section');
+            if (isStopwatchMode) {
+                btnStopwatch.classList.add('bg-purple-600', 'text-white');
+                btnStopwatch.classList.remove('text-gray-400', 'hover:text-white');
+                btnTimer.classList.remove('bg-purple-600', 'text-white');
+                btnTimer.classList.add('text-gray-400', 'hover:text-white');
+                quickStart.classList.add('hidden');
+            } else {
+                btnTimer.classList.add('bg-purple-600', 'text-white');
+                btnTimer.classList.remove('text-gray-400', 'hover:text-white');
+                btnStopwatch.classList.remove('bg-purple-600', 'text-white');
+                btnStopwatch.classList.add('text-gray-400', 'hover:text-white');
+                quickStart.classList.remove('hidden');
+            }
         }
 
         function setPreset(minutes) {
