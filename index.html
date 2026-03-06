@@ -177,7 +177,13 @@
         }
 
         function togglePlayPause() {
-            if (timeRemaining <= 0) return;
+            if (timeRemaining <= 0) {
+                timeRemaining = initialTime;
+                updateDisplay();
+                timeDisplay.classList.remove('timer-zero');
+                document.body.style.backgroundColor = '#000';
+                return;
+            }
 
             if (isRunning) {
                 clearInterval(timerInterval);
