@@ -1,0 +1,28 @@
+{
+  "name": "classhelpr-timer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "playwright test --project=dev",
+    "test:e2e:prod": "playwright test --project=prod",
+    "test:e2e:ui": "playwright test --project=dev --ui",
+    "dev": "npx serve -l 8080 ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/learningtoretireca-maker/classhelpr-timer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/learningtoretireca-maker/classhelpr-timer/issues"
+  },
+  "homepage": "https://github.com/learningtoretireca-maker/classhelpr-timer#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

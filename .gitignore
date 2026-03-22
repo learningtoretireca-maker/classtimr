@@ -1,0 +1,8 @@
+.DS_Store
+*.log
+node_modules/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
