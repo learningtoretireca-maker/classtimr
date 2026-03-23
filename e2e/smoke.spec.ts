@@ -11,7 +11,7 @@ test.describe("ClassTimr smoke tests", () => {
 
   test("Play/Pause button is visible", async ({ page }) => {
     // The play button uses an SVG icon, not text — find by its id or the button element
-    const playButton = page.locator("#playPauseBtn, button:has(svg)").first();
+    const playButton = page.locator("#btn-play");
     await expect(playButton).toBeVisible();
   });
 
