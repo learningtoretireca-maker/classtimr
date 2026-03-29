@@ -110,8 +110,9 @@
         .shadow-\[0_0_15px_rgba\(147\2c 51\2c 234\2c 0\.5\)\] { box-shadow: 0 0 15px rgba(147,51,234,0.5); }
         .drop-shadow-\[0_0_15px_rgba\(255\2c 255\2c 255\2c 0\.3\)\] { filter: drop-shadow(0 0 15px rgba(255,255,255,0.3)); }
         .opacity-0 { opacity: 0; }
-        .outline-none { outline: none; }
         .cursor-pointer { cursor: pointer; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
+        *:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
         .select-none { user-select: none; -webkit-user-select: none; }
         .transition { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.4,0,0.2,1); }
         .transition-opacity { transition-property: opacity; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.4,0,0.2,1); }
@@ -129,6 +130,7 @@
         .hover\:scale-105:hover { transform: scale(1.05); }
         .active\:scale-95:active { transform: scale(0.95); }
         .focus\:outline-none:focus { outline: none; }
+        .focus\:outline-none:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
         .focus\:border-purple-500:focus { border-color: #a855f7; }
         @media (min-width: 768px) {
             .md\:flex-row { flex-direction: row; }
@@ -199,25 +201,26 @@
 </head>
 <body class="text-white select-none">
 
-    <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0"></canvas>
+    <h1 class="sr-only">ClassTimr - Classroom Countdown Timer</h1>
+    <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0" aria-hidden="true"></canvas>
 
-    <div class="relative z-10 flex flex-col items-center justify-center min-h-screen pb-20">
-        <div class="timer-box rounded-[3rem] px-16 py-12 flex flex-col items-center justify-center cursor-pointer" onclick="togglePlayPause()">
-            <div id="time-display" class="font-digital text-[12rem] md:text-[20rem] leading-none font-bold tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+    <main class="relative z-10 flex flex-col items-center justify-center min-h-screen pb-20">
+        <div class="timer-box rounded-[3rem] px-16 py-12 flex flex-col items-center justify-center cursor-pointer" role="button" tabindex="0" aria-label="Toggle play/pause" onclick="togglePlayPause()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePlayPause()}">
+            <div id="time-display" role="timer" aria-live="assertive" aria-atomic="true" class="font-digital text-[12rem] md:text-[20rem] leading-none font-bold tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
                 15:00
             </div>
         </div>
-    </div>
+    </main>
 
     <div id="control-bar" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-7xl glass-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between z-20 transition-opacity duration-700 shadow-2xl space-y-4 md:space-y-0">
         
         <div class="flex items-center space-x-4 md:w-1/4">
-            <button id="btn-play" onclick="togglePlayPause()" class="w-14 h-14 bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(147,51,234,0.5)] text-white">
-                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            <button id="btn-play" onclick="togglePlayPause()" aria-label="Play timer" class="w-14 h-14 bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(147,51,234,0.5)] text-white">
+                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ml-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
-            <button onclick="resetTimer()" class="w-12 h-12 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition text-gray-300 hover:text-white" title="Reset Timer">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <button onclick="resetTimer()" aria-label="Reset timer" class="w-12 h-12 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition text-gray-300 hover:text-white" title="Reset Timer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
         </div>
 
@@ -241,14 +244,17 @@
 
         <div class="flex items-center justify-end space-x-4 md:w-1/4 text-sm">
             <div class="flex flex-col space-y-1">
-                <select id="music-select" onchange="changeMusic()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-2 py-1 outline-none focus:border-purple-500 cursor-pointer">
+                <label for="music-select" class="sr-only">Background music</label>
+                <select id="music-select" onchange="changeMusic()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-2 py-1 focus:border-purple-500 cursor-pointer">
                     <option value="none">🔇 None</option>
                     <option value="library">🎵 LoFi</option>
                 </select>
+                <label for="volume-slider" class="sr-only">Volume</label>
                 <input type="range" id="volume-slider" min="0" max="100" value="50" oninput="changeVolume()" class="w-full mt-1" title="Volume">
             </div>
 
-            <select id="theme-select" onchange="changeTheme()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
+            <label for="theme-select" class="sr-only">Visual theme</label>
+            <select id="theme-select" onchange="changeTheme()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-3 py-2 focus:border-purple-500 cursor-pointer">
                 <option value="space">🌌 Space Explorer</option>
                 <option value="ocean">🌊 Deep Ocean</option>
                 <option value="cyber">🟩 Cyber Matrix</option>
@@ -262,8 +268,8 @@
                 <option value="quantum">⚛️ Quantum Realm</option>
             </select>
 
-            <button onclick="toggleFullScreen()" class="p-2 text-gray-400 hover:text-white transition" title="Fullscreen">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            <button onclick="toggleFullScreen()" aria-label="Toggle fullscreen" class="p-2 text-gray-400 hover:text-white transition" title="Fullscreen">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
             </button>
         </div>
     </div>
@@ -272,8 +278,10 @@
         <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300" id="custom-time-box">
             <h3 class="text-xl text-white font-semibold mb-6 tracking-wide">Set Custom Time</h3>
             <div class="flex items-center space-x-4 text-4xl font-digital text-white mb-2">
+                <label for="custom-min" class="sr-only">Minutes</label>
                 <input type="number" id="custom-min" min="0" max="999" class="w-24 bg-gray-800 border border-gray-600 rounded-xl p-3 text-center focus:outline-none focus:border-purple-500" placeholder="MM" value="20">
-                <span class="pb-2">:</span>
+                <span class="pb-2" aria-hidden="true">:</span>
+                <label for="custom-sec" class="sr-only">Seconds</label>
                 <input type="number" id="custom-sec" min="0" max="59" class="w-24 bg-gray-800 border border-gray-600 rounded-xl p-3 text-center focus:outline-none focus:border-purple-500" placeholder="SS" value="00">
             </div>
             <div class="flex space-x-4 mt-8 w-full">
@@ -353,6 +361,7 @@
                 iconPause.classList.add('hidden');
                 btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
                 btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
+                btnPlay.setAttribute('aria-label', 'Play timer');
                 if (typeof bgAudio !== 'undefined') bgAudio.pause();
             } else {
                 if (typeof musicSelect !== 'undefined' && musicSelect.value !== 'none') {
@@ -392,6 +401,7 @@
                 iconPause.classList.remove('hidden');
                 btnPlay.classList.remove('bg-purple-600', 'hover:bg-purple-500');
                 btnPlay.classList.add('bg-red-500', 'hover:bg-red-400');
+                btnPlay.setAttribute('aria-label', 'Pause timer');
             }
             isRunning = !isRunning;
         }
