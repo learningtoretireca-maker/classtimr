@@ -211,6 +211,43 @@
         .timer-zero {
             animation: timer-zero-pulse 1s ease-in-out infinite;
         }
+
+        /* Theme picker button + popup menu (utilities below aren't in the inlined set) */
+        .theme-picker { position: relative; }
+        .theme-chevron { margin-left: 0.5rem; transition: transform 0.2s; }
+        #theme-button[aria-expanded="true"] .theme-chevron { transform: rotate(180deg); }
+        .theme-menu {
+            position: absolute;
+            bottom: calc(100% + 0.5rem);
+            right: 0;
+            width: 15rem;
+            max-height: 60vh;
+            overflow-y: auto;
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 0.75rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            padding: 0.375rem;
+            z-index: 50;
+        }
+        .theme-menu button {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            background: transparent;
+            color: #e5e7eb;
+            font-size: 0.875rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .theme-menu button:hover,
+        .theme-menu button:focus-visible { background: #374151; }
+        .theme-menu button[aria-current="true"] { background: #9333ea; color: #fff; }
     </style>
 </head>
 <body class="text-white select-none">
@@ -258,21 +295,12 @@
         </div>
 
         <div class="flex items-center justify-end space-x-4 md:w-1/4 text-sm">
-            <div class="flex flex-col items-center">
-                <label for="theme-select" class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Themes</label>
-                <select id="theme-select" onchange="changeTheme()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-3 py-2 focus:border-purple-500 cursor-pointer">
-                <option value="space">🌌 Space Explorer</option>
-                <option value="ocean">🌊 Deep Ocean</option>
-                <option value="cyber">🟩 Cyber Matrix</option>
-                <option value="biolum">🪼 Glowing Tide</option>
-                <option value="kelp">🌊 Kelp Forest</option>
-                <option value="dna">🧬 Double Helix</option>
-                <option value="koi">💮 Tranquil Koi</option>
-                <option value="magnetic">🧲 Magnetic Flux</option>
-                <option value="neural">🕸️ Neural Network</option>
-                <option value="hadron">⚡ Hadron Collider</option>
-                <option value="quantum">⚛️ Quantum Realm</option>
-                </select>
+            <div class="theme-picker">
+                <button id="theme-button" type="button" onclick="toggleThemeMenu()" aria-haspopup="true" aria-expanded="false" class="flex items-center bg-gray-800/80 text-gray-200 border border-gray-600 rounded-md px-3 py-2 hover:border-purple-400 focus:border-purple-500 cursor-pointer">
+                    <span>🎨 Themes</span>
+                    <svg class="theme-chevron h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                <div id="theme-menu" class="theme-menu hidden" role="menu" aria-label="Select theme"></div>
             </div>
 
             <button onclick="toggleFullScreen()" aria-label="Toggle fullscreen" class="p-2 text-gray-400 hover:text-white transition" title="Fullscreen">
@@ -606,8 +634,10 @@
 
         // --- 3.5 KEYBOARD SHORTCUTS ---
         document.addEventListener('keydown', (e) => {
-            // Ignore when typing in an input/select
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+            // Ignore when typing in a field or when a button/menu has focus (it handles its own keys)
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
+            if (!themeMenu.classList.contains('hidden')) return;
             if (e.code === 'Space') {
                 e.preventDefault();
                 togglePlayPause();
@@ -1294,9 +1324,25 @@
             animationId = requestAnimationFrame(animate);
         }
 
-        function changeTheme() {
-            const select = document.getElementById('theme-select');
-            currentTheme = select.value;
+        const THEMES = [
+            { v: 'space',    label: '🌌 Space Explorer' },
+            { v: 'ocean',    label: '🌊 Deep Ocean' },
+            { v: 'cyber',    label: '🟩 Cyber Matrix' },
+            { v: 'biolum',   label: '🪼 Glowing Tide' },
+            { v: 'kelp',     label: '🌊 Kelp Forest' },
+            { v: 'dna',      label: '🧬 Double Helix' },
+            { v: 'koi',      label: '💮 Tranquil Koi' },
+            { v: 'magnetic', label: '🧲 Magnetic Flux' },
+            { v: 'neural',   label: '🕸️ Neural Network' },
+            { v: 'hadron',   label: '⚡ Hadron Collider' },
+            { v: 'quantum',  label: '⚛️ Quantum Realm' }
+        ];
+
+        const themeButton = document.getElementById('theme-button');
+        const themeMenu = document.getElementById('theme-menu');
+
+        function applyTheme(value) {
+            currentTheme = value;
             savePref('classtimr-theme', currentTheme);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (currentTheme === 'biolum') {
@@ -1310,6 +1356,55 @@
             initParticles();
         }
 
+        function buildThemeMenu() {
+            themeMenu.innerHTML = '';
+            THEMES.forEach(t => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.setAttribute('role', 'menuitemradio');
+                item.setAttribute('aria-current', String(t.v === currentTheme));
+                item.textContent = t.label;
+                item.addEventListener('click', () => {
+                    applyTheme(t.v);
+                    closeThemeMenu();
+                    themeButton.focus();
+                });
+                themeMenu.appendChild(item);
+            });
+        }
+
+        function openThemeMenu() {
+            buildThemeMenu();
+            themeMenu.classList.remove('hidden');
+            themeButton.setAttribute('aria-expanded', 'true');
+            const current = themeMenu.querySelector('[aria-current="true"]') || themeMenu.querySelector('button');
+            if (current) current.focus();
+        }
+
+        function closeThemeMenu() {
+            themeMenu.classList.add('hidden');
+            themeButton.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleThemeMenu() {
+            if (themeMenu.classList.contains('hidden')) openThemeMenu();
+            else closeThemeMenu();
+        }
+
+        // Close on outside click / Escape; arrow-key navigation within the menu
+        document.addEventListener('click', (e) => {
+            if (!themeMenu.classList.contains('hidden') && !themeButton.contains(e.target) && !themeMenu.contains(e.target)) {
+                closeThemeMenu();
+            }
+        });
+        themeMenu.addEventListener('keydown', (e) => {
+            const items = Array.from(themeMenu.querySelectorAll('button'));
+            const idx = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeThemeMenu(); themeButton.focus(); }
+        });
+
         // --- 5. PREFERENCE PERSISTENCE ---
         function savePref(key, value) {
             try { localStorage.setItem(key, value); } catch (e) { /* storage disabled */ }
@@ -1321,11 +1416,9 @@
                 theme = localStorage.getItem('classtimr-theme');
             } catch (e) { return; }
 
-            const themeSelect = document.getElementById('theme-select');
-            const valid = Array.from(themeSelect.options).map(o => o.value);
-            if (theme && valid.includes(theme)) {
-                themeSelect.value = theme;
-                currentTheme = theme;
+            const match = THEMES.find(t => t.v === theme);
+            if (match) {
+                currentTheme = match.v;
             }
         }
 
