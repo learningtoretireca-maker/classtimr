@@ -1,69 +1,57 @@
 # ClassTimr Deployment Guide
 
-## Deploying to `timer.classhelpr.com` via GitHub + Railway
+## Deploying to `timr.classhelpr.com` via GitHub + Railway
+
+Repo: `learningtoretireca-maker/classtimr` · Live: **https://timr.classhelpr.com**
 
 ---
 
 ## Project File Structure
 
-Your project folder should contain exactly these 4 files:
+The app is a single static `index.html`. These are the files the Docker image serves:
 
 ```
-classhelpr-timer/
-├── index.html      ← Your timer app
-├── Dockerfile       ← Tells Railway how to build & serve
-├── nginx.conf       ← Nginx server configuration
-└── .gitignore       ← Git ignore rules
+classtimr/
+├── index.html      ← The timer app (inline CSS + JS + canvas themes)
+├── fonts/          ← Self-hosted web fonts (Inter, Share Tech Mono)
+├── Dockerfile      ← Tells Railway how to build & serve
+├── nginx.conf      ← Nginx server config (port 8080, caching, security headers)
+└── .gitignore
 ```
 
-All four files are included in this download. Copy them into a single folder on your machine.
+The `Dockerfile` copies `index.html`, `nginx.conf`, and `fonts/` into the nginx image. **If you add a new static-asset folder (images, more fonts, etc.) you must add a matching `COPY` line to the `Dockerfile`, or it will 404 in production while working locally.**
+
+The repo also contains dev/test files that are **not** part of the deployed image: `e2e/` (Playwright tests), `package.json`, `package-lock.json`, `playwright.config.ts`. These don't ship — only what the `Dockerfile` copies is served.
 
 ---
 
-## Part 1: Set Up the Project in Cursor
+## Part 1: Everyday Workflow (repo already set up)
 
-1. Open **Cursor** and go to `File → Open Folder`.
-2. Select the `classhelpr-timer` folder containing the 4 files above.
-3. Verify in the file explorer sidebar that you see `index.html`, `Dockerfile`, `nginx.conf`, and `.gitignore`.
+Railway is connected to the GitHub repo, so **any push to `main` auto-deploys**:
 
-That's it — the project is ready.
+1. Edit `index.html` (or other files).
+2. Run the tests: `npm run test:e2e`.
+3. Commit and push to `main`.
+4. Railway rebuilds and deploys within ~2 minutes.
+
+To run locally first: `npm run dev` (serves on http://localhost:8080).
 
 ---
 
-## Part 2: Push to GitHub Using Cursor
+## Part 2: First-Time Setup (only if recreating the repo)
 
-### Option A: Using Cursor's Built-in Git UI
-
-1. Click the **Source Control** icon in the left sidebar (the branch icon).
-2. Click **Initialize Repository**.
-3. Stage all files by clicking the `+` next to "Changes".
-4. Type a commit message like `Initial commit: ClassTimr app` and click the checkmark to commit.
-5. Click **Publish Branch** — Cursor will prompt you to sign into GitHub if you haven't already.
-6. Choose **public** or **private** repository, and name it `classhelpr-timer`.
-7. Cursor pushes everything to GitHub automatically.
-
-### Option B: Using the Terminal
-
-1. Open Cursor's terminal: `` Ctrl+`  `` (backtick).
-2. Run these commands:
+### Push to GitHub via terminal
 
 ```bash
-# Initialize git repo
 git init
-
-# Stage all files
 git add .
-
-# Commit
 git commit -m "Initial commit: ClassTimr app"
 
-# Create repo on GitHub (requires GitHub CLI — install with: brew install gh)
-gh repo create classhelpr-timer --public --source=. --push
+# With GitHub CLI (brew install gh):
+gh repo create classtimr --public --source=. --push
 
-# OR if you prefer manual GitHub setup:
-# 1. Go to github.com → New Repository → name it "classhelpr-timer"
-# 2. Then run:
-git remote add origin https://github.com/YOUR_USERNAME/classhelpr-timer.git
+# Or manual:
+git remote add origin https://github.com/YOUR_USERNAME/classtimr.git
 git branch -M main
 git push -u origin main
 ```
@@ -74,69 +62,51 @@ git push -u origin main
 
 ### 3a. Connect GitHub Repo
 
-1. Go to [railway.app](https://railway.app) and sign in (use GitHub login for easiest setup).
-2. Click **New Project** → **Deploy from GitHub Repo**.
-3. Select `classhelpr-timer` from the list. If you don't see it, click "Configure GitHub App" to grant Railway access.
-4. Railway will auto-detect the `Dockerfile` and begin building immediately.
+1. Go to [railway.app](https://railway.app) and sign in with GitHub.
+2. **New Project** → **Deploy from GitHub Repo**.
+3. Select `classtimr`. If it's missing, click "Configure GitHub App" to grant access.
+4. Railway auto-detects the `Dockerfile` and starts building.
 
 ### 3b. Configure the Port
 
-Railway needs to know which port your container listens on:
+1. Click the deployed service → **Settings** tab.
+2. Under **Networking**, click **Generate Domain** for a temporary `.railway.app` test URL.
+3. In the **Variables** tab add: `PORT` = `8080` (matches `nginx.conf`).
 
-1. Click on your deployed service in the Railway dashboard.
-2. Go to the **Settings** tab.
-3. Under **Networking**, click **Generate Domain** (this gives you a temporary `.railway.app` URL to test with).
-4. Go to the **Variables** tab and add: `PORT` = `8080`.
-   *(Railway's Nginx config is already set to port 8080, so this ensures they match.)*
+### 3c. Verify
 
-### 3c. Verify It Works
-
-1. Wait for the build to complete (usually under 2 minutes).
-2. Click the generated `.railway.app` URL — you should see your timer running.
+1. Wait for the build (usually under 2 minutes).
+2. Open the `.railway.app` URL — the timer should be running.
 
 ---
 
-## Part 4: Connect Your Custom Domain (`timer.classhelpr.com`)
+## Part 4: Custom Domain (`timr.classhelpr.com`)
 
 ### 4a. Add the Domain in Railway
 
-1. In your Railway service, go to **Settings** → **Networking** → **Custom Domain**.
-2. Type `timer.classhelpr.com` and click **Add**.
-3. Railway will display a **CNAME target** — it will look something like: `your-service-production-xxxx.up.railway.app`
-4. **Copy this CNAME value exactly.**
+1. Service → **Settings** → **Networking** → **Custom Domain**.
+2. Enter `timr.classhelpr.com` → **Add**.
+3. Railway shows a **CNAME target** like `your-service-production-xxxx.up.railway.app`. Copy it exactly.
 
-### 4b. Configure DNS at Your Domain Provider
+### 4b. Configure DNS
 
-Go to your domain provider's DNS settings for `classhelpr.com` and add this record:
+At the DNS provider for `classhelpr.com`, add:
 
-| Type  | Name    | Value / Target                                    | TTL  |
-|-------|---------|---------------------------------------------------|------|
-| CNAME | `timer` | `your-service-production-xxxx.up.railway.app`     | 300  |
+| Type  | Name   | Value / Target                                | TTL  |
+|-------|--------|-----------------------------------------------|------|
+| CNAME | `timr` | `your-service-production-xxxx.up.railway.app` | 300  |
 
-**Important notes:**
-- The **Name** field is just `timer` (not the full `timer.classhelpr.com` — most providers append the root domain automatically).
-- The **Value** is the CNAME target Railway gave you in step 4a.
-- TTL of 300 (5 minutes) is fine; some providers may default to 3600.
+- **Name** is just `timr` (the provider appends the root domain).
+- **Value** is the CNAME target from step 4a.
 
-### 4c. Wait for Propagation & SSL
+### 4c. Propagation & SSL
 
-- DNS changes can take anywhere from 2 minutes to 48 hours (usually under 30 minutes).
-- Railway automatically provisions a free SSL certificate once the CNAME resolves correctly.
-- You can check propagation at [dnschecker.org](https://dnschecker.org) — search for `timer.classhelpr.com` and look for your CNAME.
+- DNS: 2 minutes–48 hours (usually under 30). Check at [dnschecker.org](https://dnschecker.org).
+- Railway auto-provisions free SSL once the CNAME resolves.
 
 ### 4d. Verify
 
-Once DNS has propagated, visit **https://timer.classhelpr.com** — your ClassTimr app should be live with HTTPS.
-
----
-
-## Ongoing: Auto-Deploy on Code Changes
-
-Because Railway is connected to your GitHub repo, any time you push a new commit, Railway will automatically rebuild and deploy. Your workflow becomes:
-
-1. Edit `index.html` in Cursor.
-2. Commit & push to GitHub.
-3. Railway deploys automatically within ~2 minutes.
+Visit **https://timr.classhelpr.com** — the app should be live over HTTPS.
 
 ---
 
@@ -144,8 +114,9 @@ Because Railway is connected to your GitHub repo, any time you push a new commit
 
 | Problem | Solution |
 |---------|----------|
-| Railway build fails | Check the build logs — usually a Dockerfile syntax issue. Make sure all 3 project files are committed. |
-| Site shows "502 Bad Gateway" | The container may still be starting. Wait 30 seconds and refresh. Also verify `PORT=8080` is set in Railway variables. |
-| Custom domain not resolving | Double-check the CNAME record at your DNS provider. Use dnschecker.org to verify. DNS propagation can take up to 48 hours. |
-| SSL certificate not working | Railway auto-provisions SSL after DNS resolves. If the CNAME is correct, just wait a few minutes. |
-| Site works on `.railway.app` but not custom domain | The DNS hasn't propagated yet, or the CNAME value is wrong. Compare it exactly with what Railway shows. |
+| Railway build fails | Check build logs — usually a `Dockerfile` issue. Confirm `index.html`, `nginx.conf`, `Dockerfile`, and `fonts/` are committed. |
+| Fonts/assets 404 in prod but work locally | The asset folder isn't copied into the image. Add a `COPY <dir>/ /usr/share/nginx/html/<dir>/` line to the `Dockerfile`. |
+| Site shows "502 Bad Gateway" | Container still starting — wait 30s and refresh. Verify `PORT=8080` in Railway variables. |
+| Custom domain not resolving | Re-check the CNAME at your DNS provider; verify at dnschecker.org. Propagation can take up to 48h. |
+| SSL not working | Railway provisions SSL after DNS resolves. If the CNAME is correct, wait a few minutes. |
+| Works on `.railway.app` but not custom domain | DNS not propagated yet, or the CNAME value is wrong. Compare exactly with Railway. |

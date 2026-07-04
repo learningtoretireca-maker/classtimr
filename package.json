@@ -1,7 +1,7 @@
 {
-  "name": "classhelpr-timer",
+  "name": "classtimr",
   "version": "1.0.0",
-  "description": "",
+  "description": "Single-file classroom countdown timer (Timer/Stopwatch/Clock) with animated canvas themes.",
   "main": "index.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -12,16 +12,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/learningtoretireca-maker/classhelpr-timer.git"
+    "url": "git+https://github.com/learningtoretireca-maker/classtimr.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/learningtoretireca-maker/classhelpr-timer/issues"
+    "url": "https://github.com/learningtoretireca-maker/classtimr/issues"
   },
-  "homepage": "https://github.com/learningtoretireca-maker/classhelpr-timer#readme",
+  "homepage": "https://github.com/learningtoretireca-maker/classtimr#readme",
   "devDependencies": {
     "@playwright/test": "^1.58.2"
   }
