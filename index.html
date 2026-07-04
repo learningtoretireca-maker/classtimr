@@ -4,8 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClassTimr - Advanced Countdown</title>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* Self-hosted fonts (offline-safe, no CDN) */
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 400 600;
+            font-display: swap;
+            src: url('fonts/inter-latin.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Share Tech Mono';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('fonts/share-tech-mono-latin.woff2') format('woff2');
+        }
         /* Tailwind utility replacements */
         *, *::before, *::after { box-sizing: border-box; }
         .fixed { position: fixed; }
@@ -202,11 +216,12 @@
 <body class="text-white select-none">
 
     <h1 class="sr-only">ClassTimr - Classroom Countdown Timer</h1>
+    <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
     <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0" aria-hidden="true"></canvas>
 
     <main class="relative z-10 flex flex-col items-center justify-center min-h-screen pb-20">
         <div class="timer-box rounded-[3rem] px-16 py-12 flex flex-col items-center justify-center cursor-pointer" role="button" tabindex="0" aria-label="Toggle play/pause" onclick="togglePlayPause()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePlayPause()}">
-            <div id="time-display" role="timer" aria-live="assertive" aria-atomic="true" class="font-digital text-[12rem] md:text-[20rem] leading-none font-bold tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+            <div id="time-display" role="timer" aria-live="off" class="font-digital text-[12rem] md:text-[20rem] leading-none font-bold tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
                 15:00
             </div>
         </div>
@@ -214,7 +229,7 @@
 
     <div id="control-bar" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-7xl glass-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between z-20 transition-opacity duration-700 shadow-2xl space-y-4 md:space-y-0">
         
-        <div class="flex items-center space-x-4 md:w-1/4">
+        <div id="play-controls" class="flex items-center space-x-4 md:w-1/4">
             <button id="btn-play" onclick="togglePlayPause()" aria-label="Play timer" class="w-14 h-14 bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(147,51,234,0.5)] text-white">
                 <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ml-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
                 <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -226,35 +241,26 @@
 
         <div class="flex flex-col items-center md:w-2/4 space-y-2">
             <div class="flex bg-gray-800/80 border border-gray-600 rounded-lg p-0.5">
-                <button id="btn-mode-timer" onclick="switchMode('timer')" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-purple-600 text-white">Timer</button>
-                <button id="btn-mode-stopwatch" onclick="switchMode('stopwatch')" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Stopwatch</button>
-                <button id="btn-mode-clock" onclick="switchMode('clock')" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Clock</button>
+                <button id="btn-mode-timer" onclick="switchMode('timer')" aria-pressed="true" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-purple-600 text-white">Timer</button>
+                <button id="btn-mode-stopwatch" onclick="switchMode('stopwatch')" aria-pressed="false" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Stopwatch</button>
+                <button id="btn-mode-clock" onclick="switchMode('clock')" aria-pressed="false" class="px-4 py-1.5 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Clock</button>
             </div>
             <div id="quick-start-section" class="flex flex-col items-center">
                 <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Quick Start</span>
                 <div class="flex space-x-2">
-                    <button onclick="setPreset(1)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">1 Min</button>
-                    <button onclick="setPreset(5)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">5 Min</button>
-                    <button onclick="setPreset(10)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">10 Min</button>
-                    <button onclick="setPreset(15)" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">15 Min</button>
-                    <button onclick="showCustomTimeModal()" class="px-4 py-2 bg-gray-800/80 hover:bg-purple-600 border border-gray-600 hover:border-purple-400 rounded-lg text-sm font-medium transition">Custom</button>
+                    <button onclick="setPreset(1)" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">1 Min</button>
+                    <button onclick="setPreset(5)" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">5 Min</button>
+                    <button onclick="setPreset(10)" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">10 Min</button>
+                    <button onclick="setPreset(15)" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">15 Min</button>
+                    <button onclick="showCustomTimeModal()" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Custom</button>
                 </div>
             </div>
         </div>
 
         <div class="flex items-center justify-end space-x-4 md:w-1/4 text-sm">
-            <div class="flex flex-col space-y-1">
-                <label for="music-select" class="sr-only">Background music</label>
-                <select id="music-select" onchange="changeMusic()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-2 py-1 focus:border-purple-500 cursor-pointer">
-                    <option value="none">🔇 None</option>
-                    <option value="library">🎵 LoFi</option>
-                </select>
-                <label for="volume-slider" class="sr-only">Volume</label>
-                <input type="range" id="volume-slider" min="0" max="100" value="50" oninput="changeVolume()" class="w-full mt-1" title="Volume">
-            </div>
-
-            <label for="theme-select" class="sr-only">Visual theme</label>
-            <select id="theme-select" onchange="changeTheme()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-3 py-2 focus:border-purple-500 cursor-pointer">
+            <div class="flex flex-col items-center">
+                <label for="theme-select" class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Themes</label>
+                <select id="theme-select" onchange="changeTheme()" class="bg-gray-800/50 text-gray-200 border border-gray-600 rounded-md px-3 py-2 focus:border-purple-500 cursor-pointer">
                 <option value="space">🌌 Space Explorer</option>
                 <option value="ocean">🌊 Deep Ocean</option>
                 <option value="cyber">🟩 Cyber Matrix</option>
@@ -266,7 +272,8 @@
                 <option value="neural">🕸️ Neural Network</option>
                 <option value="hadron">⚡ Hadron Collider</option>
                 <option value="quantum">⚛️ Quantum Realm</option>
-            </select>
+                </select>
+            </div>
 
             <button onclick="toggleFullScreen()" aria-label="Toggle fullscreen" class="p-2 text-gray-400 hover:text-white transition" title="Fullscreen">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
@@ -275,8 +282,8 @@
     </div>
 
     <div id="custom-time-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300" id="custom-time-box">
-            <h3 class="text-xl text-white font-semibold mb-6 tracking-wide">Set Custom Time</h3>
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300" id="custom-time-box" role="dialog" aria-modal="true" aria-labelledby="custom-time-title">
+            <h3 id="custom-time-title" class="text-xl text-white font-semibold mb-6 tracking-wide">Set Custom Time</h3>
             <div class="flex items-center space-x-4 text-4xl font-digital text-white mb-2">
                 <label for="custom-min" class="sr-only">Minutes</label>
                 <input type="number" id="custom-min" min="0" max="999" class="w-24 bg-gray-800 border border-gray-600 rounded-xl p-3 text-center focus:outline-none focus:border-purple-500" placeholder="MM" value="20">
@@ -308,6 +315,28 @@
         const iconPlay = document.getElementById('icon-play');
         const iconPause = document.getElementById('icon-pause');
         const btnPlay = document.getElementById('btn-play');
+        const srStatus = document.getElementById('sr-status');
+        let lastAnnouncedSecond = null;
+
+        function announce(msg) {
+            srStatus.textContent = msg;
+        }
+
+        function showPlayButton() {
+            iconPlay.classList.remove('hidden');
+            iconPause.classList.add('hidden');
+            btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
+            btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
+            btnPlay.setAttribute('aria-label', 'Play timer');
+        }
+
+        function showPauseButton() {
+            iconPlay.classList.add('hidden');
+            iconPause.classList.remove('hidden');
+            btnPlay.classList.remove('bg-purple-600', 'hover:bg-purple-500');
+            btnPlay.classList.add('bg-red-500', 'hover:bg-red-400');
+            btnPlay.setAttribute('aria-label', 'Pause timer');
+        }
 
         function updateDisplay() {
             if (isClockMode) {
@@ -327,8 +356,13 @@
             if (!isStopwatchMode) {
                 if (timeRemaining <= 10 && timeRemaining > 0) {
                     timeDisplay.classList.add('text-red-400');
+                    if (timeRemaining !== lastAnnouncedSecond) {
+                        announce(timeRemaining + (timeRemaining === 1 ? ' second remaining' : ' seconds remaining'));
+                        lastAnnouncedSecond = timeRemaining;
+                    }
                 } else {
                     timeDisplay.classList.remove('text-red-400');
+                    lastAnnouncedSecond = null;
                 }
                 if (timeRemaining > 0) {
                     timeDisplay.classList.remove('timer-zero');
@@ -352,25 +386,16 @@
             if (isClockMode) return;
             if (!isStopwatchMode && timeRemaining <= 0 && !isRunning) {
                 timeRemaining = initialTime;
-                updateDisplay();
                 timeDisplay.classList.remove('timer-zero');
                 document.body.style.backgroundColor = '#000';
-                return;
+                // fall through into the start branch — one press resets AND starts
             }
 
             if (isRunning) {
                 clearInterval(timerInterval);
-                iconPlay.classList.remove('hidden');
-                iconPause.classList.add('hidden');
-                btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
-                btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
-                btnPlay.setAttribute('aria-label', 'Play timer');
-                if (typeof bgAudio !== 'undefined') bgAudio.pause();
+                showPlayButton();
+                announce('Paused at ' + timeDisplay.textContent);
             } else {
-                if (typeof musicSelect !== 'undefined' && musicSelect.value !== 'none') {
-                    playCurrentTrack();
-                }
-
                 timerStartedAt = Date.now();
                 if (isStopwatchMode) {
                     timerStartValue = elapsedTime;
@@ -389,22 +414,16 @@
                             updateDisplay();
                             clearInterval(timerInterval);
                             isRunning = false;
-                            iconPlay.classList.remove('hidden');
-                            iconPause.classList.add('hidden');
-                            btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
-                            btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
-                            if (typeof bgAudio !== 'undefined') bgAudio.pause();
+                            showPlayButton();
                             timeDisplay.classList.add('timer-zero');
+                            announce("Time's up");
+                            lastAnnouncedSecond = null;
                             document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
                             setTimeout(() => document.body.style.backgroundColor = "#000", 400);
                         }
                     }, 250);
                 }
-                iconPlay.classList.add('hidden');
-                iconPause.classList.remove('hidden');
-                btnPlay.classList.remove('bg-purple-600', 'hover:bg-purple-500');
-                btnPlay.classList.add('bg-red-500', 'hover:bg-red-400');
-                btnPlay.setAttribute('aria-label', 'Pause timer');
+                showPauseButton();
             }
             isRunning = !isRunning;
         }
@@ -421,11 +440,7 @@
             } else {
                 timeRemaining = initialTime;
             }
-            iconPlay.classList.remove('hidden');
-            iconPause.classList.add('hidden');
-            btnPlay.classList.remove('bg-red-500', 'hover:bg-red-400');
-            btnPlay.classList.add('bg-purple-600', 'hover:bg-purple-500');
-            if (typeof bgAudio !== 'undefined') bgAudio.pause();
+            showPlayButton();
             timeDisplay.classList.remove('timer-zero');
             timeDisplay.classList.remove('text-red-400');
             document.body.style.backgroundColor = "#000";
@@ -447,18 +462,20 @@
             const btnStopwatch = document.getElementById('btn-mode-stopwatch');
             const btnClock = document.getElementById('btn-mode-clock');
             const quickStart = document.getElementById('quick-start-section');
-            const playControls = document.querySelector('.flex.items-center.space-x-4.md\\:w-1\\/4:first-child') || btnPlay.parentElement;
+            const playControls = document.getElementById('play-controls') || btnPlay.parentElement;
 
             // Reset all mode buttons
             [btnTimer, btnStopwatch, btnClock].forEach(btn => {
                 btn.classList.remove('bg-purple-600', 'text-white');
                 btn.classList.add('text-gray-400', 'hover:text-white');
+                btn.setAttribute('aria-pressed', 'false');
             });
 
             // Highlight active mode
             const activeBtn = mode === 'timer' ? btnTimer : mode === 'stopwatch' ? btnStopwatch : btnClock;
             activeBtn.classList.add('bg-purple-600', 'text-white');
             activeBtn.classList.remove('text-gray-400', 'hover:text-white');
+            activeBtn.setAttribute('aria-pressed', 'true');
 
             // Show/hide quick start and play controls
             if (isClockMode) {
@@ -482,21 +499,26 @@
             timeDisplay.classList.remove('timer-zero');
             document.body.style.backgroundColor = '#000';
             updateDisplay();
-            if (!isRunning) {
-                togglePlayPause();
-            }
+            if (isRunning) { clearInterval(timerInterval); isRunning = false; }
+            togglePlayPause();  // recaptures timerStartValue from the new time
         }
 
         // --- CUSTOM TIME MODAL LOGIC ---
         const customModal = document.getElementById('custom-time-modal');
         const customBox = document.getElementById('custom-time-box');
         
+        let modalOpener = null;
+        const mainEl = document.querySelector('main');
+
         function showCustomTimeModal() {
+            modalOpener = document.activeElement;
             customModal.classList.remove('hidden');
             void customModal.offsetWidth;
             customModal.classList.remove('opacity-0');
             customBox.classList.remove('scale-95');
             customBox.classList.add('scale-100');
+            controlBar.setAttribute('aria-hidden', 'true');
+            mainEl.setAttribute('aria-hidden', 'true');
             document.getElementById('custom-min').focus();
         }
 
@@ -504,13 +526,35 @@
             customModal.classList.add('opacity-0');
             customBox.classList.remove('scale-100');
             customBox.classList.add('scale-95');
+            controlBar.removeAttribute('aria-hidden');
+            mainEl.removeAttribute('aria-hidden');
             setTimeout(() => { customModal.classList.add('hidden'); }, 300);
+            if (modalOpener && typeof modalOpener.focus === 'function') modalOpener.focus();
+            modalOpener = null;
         }
+
+        // Backdrop click closes
+        customModal.addEventListener('click', (e) => {
+            if (e.target === customModal) closeCustomTimeModal();
+        });
+
+        // Escape closes, Enter submits, Tab trapped within the dialog
+        customModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeCustomTimeModal(); return; }
+            if (e.key === 'Enter') { e.preventDefault(); applyCustomTime(); return; }
+            if (e.key === 'Tab') {
+                const focusable = customBox.querySelectorAll('input, button');
+                const first = focusable[0], last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
 
         function applyCustomTime() {
             let min = parseInt(document.getElementById('custom-min').value);
             let sec = parseInt(document.getElementById('custom-sec').value);
             if (isNaN(min) || min < 0) min = 0;
+            if (min > 999) min = 999;
             if (isNaN(sec) || sec < 0) sec = 0;
             if (sec > 59) sec = 59;
             initialTime = (min * 60) + sec;
@@ -518,62 +562,11 @@
             timeRemaining = initialTime;
             updateDisplay();
             closeCustomTimeModal();
-            if (!isRunning) {
-                togglePlayPause();
-            }
+            if (isRunning) { clearInterval(timerInterval); isRunning = false; }
+            togglePlayPause();  // recaptures timerStartValue from the new time
         }
 
         updateDisplay();
-
-        // --- 1.5 AUDIO & MUSIC LOGIC ---
-        const bgAudio = new Audio();
-        bgAudio.loop = false;
-
-        const PLAYLIST = [
-            'audio/lofi-background.mp3',
-            'audio/lofi-deep-focus.mp3',
-            'audio/lofi-girl.mp3',
-            'audio/lchill-night.mp3',
-            'audio/llofi-jazz.mp3',
-            'audio/library-lofi.mp3',
-            'audio/library-coffee.mp3'
-        ];
-        let currentTrackIndex = 0;
-
-        const musicSelect = document.getElementById('music-select');
-        const volumeSlider = document.getElementById('volume-slider');
-
-        function playNextTrack() {
-            if (musicSelect.value !== 'library' || PLAYLIST.length === 0) return;
-            currentTrackIndex = (currentTrackIndex + 1) % PLAYLIST.length;
-            bgAudio.src = PLAYLIST[currentTrackIndex];
-            bgAudio.volume = volumeSlider.value / 100;
-            bgAudio.play().catch(e => console.log("Audio play prevented:", e));
-        }
-
-        bgAudio.addEventListener('ended', playNextTrack);
-
-        function playCurrentTrack() {
-            if (musicSelect.value !== 'library' || PLAYLIST.length === 0) return;
-            bgAudio.src = PLAYLIST[currentTrackIndex];
-            bgAudio.volume = volumeSlider.value / 100;
-            bgAudio.play().catch(e => console.log("Audio play prevented:", e));
-        }
-
-        function changeMusic() {
-            if (musicSelect.value === 'none') {
-                bgAudio.pause();
-            } else {
-                currentTrackIndex = 0;
-                if (isRunning) {
-                    playCurrentTrack();
-                }
-            }
-        }
-
-        function changeVolume() {
-            bgAudio.volume = volumeSlider.value / 100;
-        }
 
         // --- 2. CONTROL BAR AUTO-FADE LOGIC ---
         let fadeTimeout;
@@ -812,7 +805,11 @@
             canvas.height = window.innerHeight;
             initParticles();
         }
-        window.addEventListener('resize', resizeCanvas);
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resizeCanvas, 150);
+        });
 
         function initParticles() {
             particles = [];
@@ -1300,6 +1297,7 @@
         function changeTheme() {
             const select = document.getElementById('theme-select');
             currentTheme = select.value;
+            savePref('classtimr-theme', currentTheme);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (currentTheme === 'biolum') {
                 ctx.fillStyle = '#020205';
@@ -1312,6 +1310,26 @@
             initParticles();
         }
 
+        // --- 5. PREFERENCE PERSISTENCE ---
+        function savePref(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { /* storage disabled */ }
+        }
+
+        function restorePrefs() {
+            let theme;
+            try {
+                theme = localStorage.getItem('classtimr-theme');
+            } catch (e) { return; }
+
+            const themeSelect = document.getElementById('theme-select');
+            const valid = Array.from(themeSelect.options).map(o => o.value);
+            if (theme && valid.includes(theme)) {
+                themeSelect.value = theme;
+                currentTheme = theme;
+            }
+        }
+
+        restorePrefs();
         resizeCanvas();
         animate();
     </script>
