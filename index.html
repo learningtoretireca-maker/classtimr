@@ -413,6 +413,36 @@
             document.title = `${formattedTime} ${ampm} - ClassTimr`;
         }
 
+        function handleTimerComplete() {
+            timeRemaining = 0;
+            updateDisplay();
+            clearInterval(timerInterval);
+            isRunning = false;
+            showPlayButton();
+            timeDisplay.classList.add('timer-zero');
+            announce("Time's up");
+            lastAnnouncedSecond = null;
+            document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
+            setTimeout(() => document.body.style.backgroundColor = "#000", 400);
+        }
+
+        // Both ticks derive their value from Date.now() rather than counting
+        // intervals, so they stay correct no matter how badly the browser
+        // throttles the interval. That also lets us call them on demand.
+        function tickCountdown() {
+            timeRemaining = timerStartValue - Math.floor((Date.now() - timerStartedAt) / 1000);
+            if (timeRemaining > 0) {
+                updateDisplay();
+            } else {
+                handleTimerComplete();
+            }
+        }
+
+        function tickStopwatch() {
+            elapsedTime = timerStartValue + Math.floor((Date.now() - timerStartedAt) / 1000);
+            updateDisplay();
+        }
+
         function togglePlayPause() {
             if (isClockMode) return;
             if (!isStopwatchMode && timeRemaining <= 0 && !isRunning) {
@@ -430,29 +460,10 @@
                 timerStartedAt = Date.now();
                 if (isStopwatchMode) {
                     timerStartValue = elapsedTime;
-                    timerInterval = setInterval(() => {
-                        elapsedTime = timerStartValue + Math.floor((Date.now() - timerStartedAt) / 1000);
-                        updateDisplay();
-                    }, 250);
+                    timerInterval = setInterval(tickStopwatch, 250);
                 } else {
                     timerStartValue = timeRemaining;
-                    timerInterval = setInterval(() => {
-                        timeRemaining = timerStartValue - Math.floor((Date.now() - timerStartedAt) / 1000);
-                        if (timeRemaining > 0) {
-                            updateDisplay();
-                        } else {
-                            timeRemaining = 0;
-                            updateDisplay();
-                            clearInterval(timerInterval);
-                            isRunning = false;
-                            showPlayButton();
-                            timeDisplay.classList.add('timer-zero');
-                            announce("Time's up");
-                            lastAnnouncedSecond = null;
-                            document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
-                            setTimeout(() => document.body.style.backgroundColor = "#000", 400);
-                        }
-                    }, 250);
+                    timerInterval = setInterval(tickCountdown, 250);
                 }
                 showPauseButton();
             }
@@ -1424,6 +1435,32 @@
                 currentTheme = match.v;
             }
         }
+
+        // Hidden tabs get their setInterval throttled to roughly once a minute,
+        // so a countdown that hits zero while you're on another tab can sit
+        // there un-fired. Re-sync from the wall clock as soon as we're visible
+        // again, and drop the canvas loop while nobody can see it.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                return;
+            }
+
+            if (animationId === null) {
+                animate();
+            }
+
+            if (isClockMode) {
+                updateClockDisplay();
+            } else if (isRunning) {
+                if (isStopwatchMode) {
+                    tickStopwatch();
+                } else {
+                    tickCountdown();
+                }
+            }
+        });
 
         restorePrefs();
         resizeCanvas();
