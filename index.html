@@ -197,8 +197,23 @@
             box-shadow: 0 0 40px rgba(168, 85, 247, 0.2);
         }
 
+        /* Sits above the canvas (z-0) but below the digits (z-10). The old
+           completion flash wrote to document.body, which the canvas covers. */
+        #flash-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            background: #ef4444;
+            opacity: 0;
+            transition: opacity 120ms ease-out;
+        }
+        #flash-overlay.flash-active { opacity: 0.45; }
+
+        /* 0.9 not 0.7: at 0.7 a bright frame behind the panel drags the label
+           contrast down to ~2.4:1. */
         .glass-panel {
-            background: rgba(17, 24, 39, 0.7);
+            background: rgba(17, 24, 39, 0.9);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -210,6 +225,23 @@
         }
         .timer-zero {
             animation: timer-zero-pulse 1s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            /* Zero still reads as urgent, it just holds still. The canvas is
+               frozen from JS — see the reduceMotion branch in animate(). */
+            .timer-zero {
+                animation: none;
+                color: #ef4444;
+                text-shadow: 0 0 40px rgba(239, 68, 68, 0.6);
+            }
+            #flash-overlay,
+            .timer-box,
+            .transition,
+            .transition-opacity,
+            .transition-transform,
+            .theme-chevron,
+            .theme-menu button { transition: none; }
         }
 
         /* Theme picker button + popup menu (utilities below aren't in the inlined set) */
@@ -255,6 +287,7 @@
     <h1 class="sr-only">ClassTimr - Classroom Countdown Timer</h1>
     <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
     <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0" aria-hidden="true"></canvas>
+    <div id="flash-overlay" aria-hidden="true"></div>
 
     <button onclick="toggleFullScreen()" aria-label="Toggle fullscreen" title="Fullscreen"
         class="glass-panel"
@@ -298,7 +331,7 @@
                 </div>
             </div>
             <div id="quick-start-section" class="flex flex-col items-center">
-                <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Quick Start</span>
+                <span class="text-xs text-gray-300 font-semibold uppercase tracking-wider mb-2">Quick Start</span>
                 <div class="flex space-x-2">
                     <button onclick="setPreset(1)" class="px-4 py-2 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">1 Min</button>
                     <button onclick="setPreset(5)" class="px-4 py-2 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">5 Min</button>
@@ -322,6 +355,7 @@
                 <label for="custom-sec" class="sr-only">Seconds</label>
                 <input type="number" id="custom-sec" min="0" max="59" class="w-24 bg-gray-800 text-white border border-gray-600 rounded-xl p-3 text-center focus:outline-none focus:border-purple-500" placeholder="SS" value="00">
             </div>
+            <p id="custom-time-error" role="alert" class="text-sm text-red-400 mt-1"></p>
             <div class="flex space-x-4 mt-8 w-full">
                 <button onclick="closeCustomTimeModal()" class="flex-1 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 transition font-medium">Cancel</button>
                 <button onclick="applyCustomTime()" class="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] transition">Set Time</button>
@@ -331,6 +365,12 @@
 
     <script>
         // --- 1. TIMER LOGIC ---
+        // remainingMs / elapsedMs are the source of truth; timeRemaining and
+        // elapsedTime are the whole-second values the display reads. Keeping
+        // only the rounded seconds meant every pause threw away the fraction
+        // below the last whole second, so repeated pauses ran the clock fast.
+        let remainingMs = 15 * 60 * 1000;
+        let elapsedMs = 0;
         let timeRemaining = 15 * 60;
         let initialTime = timeRemaining;
         let timerInterval = null;
@@ -347,6 +387,8 @@
         const iconPause = document.getElementById('icon-pause');
         const btnPlay = document.getElementById('btn-play');
         const srStatus = document.getElementById('sr-status');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
         let lastAnnouncedSecond = null;
 
         function announce(msg) {
@@ -413,7 +455,15 @@
             document.title = `${formattedTime} ${ampm} - ClassTimr`;
         }
 
+        // Clears every trace of a finished countdown: the pulsing digits, the
+        // last-ten-seconds red, and the completion flash.
+        function clearZeroState() {
+            timeDisplay.classList.remove('timer-zero', 'text-red-400');
+            flashOverlay.classList.remove('flash-active');
+        }
+
         function handleTimerComplete() {
+            remainingMs = 0;
             timeRemaining = 0;
             updateDisplay();
             clearInterval(timerInterval);
@@ -422,16 +472,23 @@
             timeDisplay.classList.add('timer-zero');
             announce("Time's up");
             lastAnnouncedSecond = null;
-            document.body.style.backgroundColor = "rgba(239, 68, 68, 0.3)";
-            setTimeout(() => document.body.style.backgroundColor = "#000", 400);
+            // The flash goes on an overlay above the canvas. Writing it to
+            // document.body did nothing — the canvas repaints an opaque fill
+            // over the body background on every frame, in every theme.
+            if (!reduceMotion.matches) {
+                flashOverlay.classList.add('flash-active');
+                setTimeout(() => flashOverlay.classList.remove('flash-active'), 400);
+            }
         }
 
         // Both ticks derive their value from Date.now() rather than counting
         // intervals, so they stay correct no matter how badly the browser
         // throttles the interval. That also lets us call them on demand.
         function tickCountdown() {
-            timeRemaining = timerStartValue - Math.floor((Date.now() - timerStartedAt) / 1000);
-            if (timeRemaining > 0) {
+            remainingMs = timerStartValue - (Date.now() - timerStartedAt);
+            if (remainingMs > 0) {
+                // ceil, so a fresh 15:00 reads 15:00 for its first full second
+                timeRemaining = Math.ceil(remainingMs / 1000);
                 updateDisplay();
             } else {
                 handleTimerComplete();
@@ -439,35 +496,58 @@
         }
 
         function tickStopwatch() {
-            elapsedTime = timerStartValue + Math.floor((Date.now() - timerStartedAt) / 1000);
+            elapsedMs = timerStartValue + (Date.now() - timerStartedAt);
+            elapsedTime = Math.floor(elapsedMs / 1000);
             updateDisplay();
+        }
+
+        function startTimer() {
+            timerStartedAt = Date.now();
+            timerStartValue = isStopwatchMode ? elapsedMs : remainingMs;
+            timerInterval = setInterval(isStopwatchMode ? tickStopwatch : tickCountdown, 250);
+            showPauseButton();
+            isRunning = true;
+        }
+
+        // Tick once before stopping. The stored value is floored to whole
+        // seconds, so without this every pause hands back up to a second of
+        // real time and repeated pauses drift the timer fast.
+        function pauseTimer() {
+            if (isStopwatchMode) tickStopwatch(); else tickCountdown();
+            clearInterval(timerInterval);
+            showPlayButton();
+            isRunning = false;
         }
 
         function togglePlayPause() {
             if (isClockMode) return;
             if (!isStopwatchMode && timeRemaining <= 0 && !isRunning) {
                 timeRemaining = initialTime;
-                timeDisplay.classList.remove('timer-zero');
-                document.body.style.backgroundColor = '#000';
+                remainingMs = initialTime * 1000;
+                clearZeroState();
                 // fall through into the start branch — one press resets AND starts
             }
 
             if (isRunning) {
-                clearInterval(timerInterval);
-                showPlayButton();
+                pauseTimer();
                 announce('Paused at ' + timeDisplay.textContent);
             } else {
-                timerStartedAt = Date.now();
-                if (isStopwatchMode) {
-                    timerStartValue = elapsedTime;
-                    timerInterval = setInterval(tickStopwatch, 250);
-                } else {
-                    timerStartValue = timeRemaining;
-                    timerInterval = setInterval(tickCountdown, 250);
-                }
-                showPauseButton();
+                startTimer();
             }
-            isRunning = !isRunning;
+        }
+
+        // Load a new duration without changing whether the clock is moving:
+        // stopped stays stopped so a teacher can set up before class, running
+        // restarts running from the new time.
+        function applyDuration(seconds) {
+            const wasRunning = isRunning;
+            if (wasRunning) pauseTimer();
+            initialTime = seconds;
+            timeRemaining = seconds;
+            remainingMs = seconds * 1000;
+            clearZeroState();
+            updateDisplay();
+            if (wasRunning) startTimer();
         }
 
         function resetTimer() {
@@ -479,22 +559,21 @@
                 return;
             } else if (isStopwatchMode) {
                 elapsedTime = 0;
+                elapsedMs = 0;
             } else {
                 timeRemaining = initialTime;
+                remainingMs = initialTime * 1000;
             }
             showPlayButton();
-            timeDisplay.classList.remove('timer-zero');
-            timeDisplay.classList.remove('text-red-400');
-            document.body.style.backgroundColor = "#000";
+            clearZeroState();
             updateDisplay();
         }
 
         function switchMode(mode) {
-            // Stop clock interval if leaving clock mode
-            if (isClockMode && mode !== 'clock') {
-                clearInterval(clockInterval);
-                clockInterval = null;
-            }
+            // Unconditional — re-selecting the mode you are already in used to
+            // skip this and leak another live interval on every click.
+            clearInterval(clockInterval);
+            clockInterval = null;
 
             isStopwatchMode = (mode === 'stopwatch');
             isClockMode = (mode === 'clock');
@@ -536,24 +615,22 @@
         }
 
         function setPreset(minutes) {
-            initialTime = minutes * 60;
-            timeRemaining = initialTime;
-            timeDisplay.classList.remove('timer-zero');
-            document.body.style.backgroundColor = '#000';
-            updateDisplay();
-            if (isRunning) { clearInterval(timerInterval); isRunning = false; }
-            togglePlayPause();  // recaptures timerStartValue from the new time
+            applyDuration(minutes * 60);
         }
 
         // --- CUSTOM TIME MODAL LOGIC ---
         const customModal = document.getElementById('custom-time-modal');
         const customBox = document.getElementById('custom-time-box');
-        
+        const customError = document.getElementById('custom-time-error');
+
         let modalOpener = null;
         const mainEl = document.querySelector('main');
 
+        customBox.addEventListener('input', () => { customError.textContent = ''; });
+
         function showCustomTimeModal() {
             modalOpener = document.activeElement;
+            customError.textContent = '';
             customModal.classList.remove('hidden');
             void customModal.offsetWidth;
             customModal.classList.remove('opacity-0');
@@ -583,7 +660,13 @@
         // Escape closes, Enter submits, Tab trapped within the dialog
         customModal.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') { e.preventDefault(); closeCustomTimeModal(); return; }
-            if (e.key === 'Enter') { e.preventDefault(); applyCustomTime(); return; }
+            // Let buttons handle their own Enter — swallowing it here meant
+            // Enter on Cancel applied the time instead of cancelling.
+            if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+                applyCustomTime();
+                return;
+            }
             if (e.key === 'Tab') {
                 const focusable = customBox.querySelectorAll('input, button');
                 const first = focusable[0], last = focusable[focusable.length - 1];
@@ -599,13 +682,16 @@
             if (min > 999) min = 999;
             if (isNaN(sec) || sec < 0) sec = 0;
             if (sec > 59) sec = 59;
-            initialTime = (min * 60) + sec;
-            if (initialTime === 0) return;
-            timeRemaining = initialTime;
-            updateDisplay();
+            // Validate before assigning. Writing initialTime first meant a
+            // rejected 0:00 still clobbered it, which silently broke Reset for
+            // the rest of the session.
+            const total = (min * 60) + sec;
+            if (total === 0) {
+                customError.textContent = 'Enter at least one second.';
+                return;
+            }
+            applyDuration(total);
             closeCustomTimeModal();
-            if (isRunning) { clearInterval(timerInterval); isRunning = false; }
-            togglePlayPause();  // recaptures timerStartValue from the new time
         }
 
         updateDisplay();
@@ -617,20 +703,26 @@
 
         function resetFadeTimer() {
             controlBar.classList.remove('opacity-0', 'pointer-events-none');
+            controlBar.inert = false;
             timerBox.style.cursor = 'pointer';
             document.body.style.cursor = 'default';
             clearTimeout(fadeTimeout);
             fadeTimeout = setTimeout(() => {
-                if (!controlBar.matches(':hover')) {
-                    controlBar.classList.add('opacity-0', 'pointer-events-none');
-                    document.body.style.cursor = 'none';
-                }
+                // Don't fade out from under a keyboard user, and mark the bar
+                // inert once hidden — opacity alone left it in the tab order.
+                if (controlBar.matches(':hover') || controlBar.contains(document.activeElement)) return;
+                controlBar.classList.add('opacity-0', 'pointer-events-none');
+                controlBar.inert = true;
+                document.body.style.cursor = 'none';
             }, 3000);
         }
 
         document.addEventListener('mousemove', resetFadeTimer);
         document.addEventListener('click', resetFadeTimer);
-        document.addEventListener('keypress', resetFadeTimer);
+        // keydown, not keypress: Tab fires no keypress, so a keyboard user
+        // could never reveal the bar again once it went inert. This runs
+        // before the default focus move, so Tab lands on a live control.
+        document.addEventListener('keydown', resetFadeTimer);
         resetFadeTimer();
 
         // --- 3. FULLSCREEN LOGIC ---
@@ -648,9 +740,15 @@
 
         // --- 3.5 KEYBOARD SHORTCUTS ---
         document.addEventListener('keydown', (e) => {
-            // Ignore when typing in a field or when a button/menu has focus (it handles its own keys)
+            // Never hijack a browser shortcut — Cmd+F used to also toggle
+            // fullscreen and Cmd+R used to reset the timer on the way out.
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            // Ignore when typing in a field or when a button/menu has focus (it handles its own keys).
+            // role=button counts: the timer box is a DIV with its own onkeydown,
+            // so without this Space fired twice and cancelled itself out.
             const tag = e.target.tagName;
             if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
+            if (e.target.closest('[role="button"]')) return;
             if (!themeMenu.classList.contains('hidden')) return;
             if (e.code === 'Space') {
                 e.preventDefault();
@@ -848,6 +946,7 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             initParticles();
+            if (reduceMotion.matches) paintStaticFrame();
         }
         let resizeTimeout;
         window.addEventListener('resize', () => {
@@ -1013,7 +1112,7 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        function animate() {
+        function drawFrame() {
             ctx.globalCompositeOperation = 'source-over';
             if (currentTheme === 'space') {
                 ctx.fillStyle = '#050510';
@@ -1334,9 +1433,33 @@
 
             if (currentTheme === 'biolum') biolumTime += 0.005;
             if (currentTheme === 'kelp') particles = particles.filter(p => p.y >= -10);
+        }
 
+        // Under reduced motion the background is painted once and left alone.
+        // It takes a run of frames, not one: cyber, biolum and magnetic build
+        // their image out of translucent layers and look empty after a single
+        // pass.
+        const WARMUP_FRAMES = 30;
+
+        function paintStaticFrame() {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+            for (let i = 0; i < WARMUP_FRAMES; i++) drawFrame();
+        }
+
+        function animate() {
+            if (reduceMotion.matches) {
+                paintStaticFrame();
+                return;
+            }
+            drawFrame();
             animationId = requestAnimationFrame(animate);
         }
+
+        reduceMotion.addEventListener('change', () => {
+            if (reduceMotion.matches) paintStaticFrame();
+            else if (animationId === null) animate();
+        });
 
         const THEMES = [
             { v: 'space',    label: '🌌 Space Explorer' },
@@ -1368,6 +1491,9 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             initParticles();
+            // The rAF loop is stopped under reduced motion, so a theme change
+            // has to repaint itself.
+            if (reduceMotion.matches) paintStaticFrame();
         }
 
         function buildThemeMenu() {

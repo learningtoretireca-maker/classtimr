@@ -61,8 +61,9 @@ test.describe("ClassTimr interactions", () => {
   });
 
   test("changing preset while running restarts from the new time (bug #1)", async ({ page }) => {
-    // 10 Min starts counting immediately
+    // Presets no longer auto-start (review finding #5) — press Play explicitly
     await page.getByRole("button", { name: "10 Min", exact: true }).click();
+    await page.locator("#btn-play").click();
     await page.waitForTimeout(1200);
     // Switch to 5 Min mid-run — must restart at 5:00, not revert toward 10:00
     await page.getByRole("button", { name: "5 Min", exact: true }).click();
@@ -93,7 +94,8 @@ test.describe("ClassTimr interactions", () => {
     await page.locator("#custom-sec").fill("30");
     await page.keyboard.press("Enter");
     await expect(page.locator("#custom-time-modal")).toBeHidden();
+    // Applies the time but no longer auto-starts (review finding #5)
     const text = (await page.locator("#time-display").textContent())?.trim() || "";
-    expect(text).toMatch(/^07:(2\d|30)$/);
+    expect(text).toBe("07:30");
   });
 });
