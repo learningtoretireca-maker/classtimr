@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClassTimr - Advanced Countdown</title>
+
+    <!-- Icons. Declared explicitly because this is a static site with no
+         framework convention to pick them up: without a rel="icon" the browser
+         falls back to guessing /favicon.ico, and nginx serves .ico as a static
+         asset with no try_files fallback, so that guess 404s on every load.
+         The mark is the four-square Classhelpr logo, same geometry and palette
+         as ClassMapr's SuiteMark, so the suite reads as one family in a tab
+         strip. -->
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#111827">
     <style>
         /* Self-hosted fonts (offline-safe, no CDN) */
         @font-face {
