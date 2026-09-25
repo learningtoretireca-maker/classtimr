@@ -57,6 +57,9 @@ test.describe("review regressions", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Custom" }).click();
     await page.getByRole("button", { name: "Set Time" }).click(); // 20:00 default, valid
+    // Closing the modal folds the island back to its pill; hover to reopen it.
+    await expect(page.locator("#custom-time-modal")).toHaveClass(/hidden/);
+    await page.locator("#island").hover();
     await page.getByRole("button", { name: "Custom" }).click();
     await page.locator("#custom-min").fill("0");
     await page.locator("#custom-sec").fill("0");
