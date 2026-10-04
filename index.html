@@ -3,7 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClassTimr - Advanced Countdown</title>
+    <title>Timr — Free Full-Screen Classroom Timer (No Ads)</title>
+    <meta name="description" content="A big, full-screen classroom timer your whole class can read from the back row. Countdown, stopwatch and clock. Free, no ads, no sign-up.">
+    <link rel="canonical" href="https://timr.classhelpr.com/">
+
+    <!-- Share cards. og.png is a static file in the repo root and has its own
+         COPY line in the Dockerfile — leave that out and every share card
+         loses its image in production. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Classhelpr">
+    <meta property="og:locale" content="en_CA">
+    <meta property="og:url" content="https://timr.classhelpr.com/">
+    <meta property="og:title" content="Timr — Free Full-Screen Classroom Timer (No Ads)">
+    <meta property="og:description" content="A big, full-screen classroom timer your whole class can read from the back row. Countdown, stopwatch and clock. Free, no ads, no sign-up.">
+    <meta property="og:image" content="https://timr.classhelpr.com/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Timr counting down from 15:00 on the Space Explorer theme.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Timr — Free Full-Screen Classroom Timer (No Ads)">
+    <meta name="twitter:description" content="A big, full-screen classroom timer your whole class can read from the back row. Countdown, stopwatch and clock. Free, no ads, no sign-up.">
+    <meta name="twitter:image" content="https://timr.classhelpr.com/og.png">
+    <meta name="twitter:image:alt" content="Timr counting down from 15:00 on the Space Explorer theme.">
+
+    <!-- Structured data. A JSON data block, not a script: the CSP never
+         executes it, so it needs no hash or nonce. -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Timr",
+        "url": "https://timr.classhelpr.com/",
+        "description": "A big, full-screen classroom timer your whole class can read from the back row. Countdown, stopwatch and clock. Free, no ads, no sign-up.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "publisher": { "@type": "Organization", "name": "Classhelpr", "url": "https://classhelpr.com" }
+    }
+    </script>
 
     <!-- Icons. Declared explicitly because this is a static site with no
          framework convention to pick them up: without a rel="icon" the browser
@@ -175,12 +213,50 @@
             .md\:w-1\/4 { width: 25%; }
             .md\:w-2\/4 { width: 50%; }
         }
+        /* The page scrolls vertically so the #about section below the timer is
+           reachable, but never in fullscreen: that is the projector view, and
+           it must be the timer and nothing else. The fullscreen rules are
+           written out separately because one unknown prefixed selector in a
+           list would drop the whole rule. display-mode covers browser
+           fullscreen (F11), which :fullscreen does not match. */
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
             background-color: #000;
         }
+        html:fullscreen body { overflow: hidden; }
+        html:fullscreen #about { display: none; }
+        html:-webkit-full-screen body { overflow: hidden; }
+        html:-webkit-full-screen #about { display: none; }
+        @media (display-mode: fullscreen) {
+            body { overflow: hidden; }
+            #about { display: none; }
+        }
+
+        /* Crawlable "about" content below the first screen. Opaque so the
+           animated canvas behind it doesn't fight the text. */
+        #about {
+            position: relative;
+            z-index: 10;
+            background: #111827;
+            color: #e5e7eb;
+            user-select: text;
+            -webkit-user-select: text;
+            padding: 4rem 1.5rem 5rem;
+            line-height: 1.6;
+        }
+        #about .about-inner { max-width: 70ch; margin: 0 auto; }
+        #about h2 { font-size: 1.75rem; font-weight: 700; color: #fff; margin: 2.5rem 0 0.75rem; }
+        #about h2:first-child { margin-top: 0; }
+        #about h3 { font-size: 1.125rem; font-weight: 600; color: #fff; margin: 1.5rem 0 0.25rem; }
+        #about p { margin: 0 0 1rem; }
+        #about ul { margin: 0 0 1rem; padding-left: 1.25rem; list-style: disc; }
+        #about li { margin: 0.25rem 0; }
+        #about a { color: #c4b5fd; text-decoration: underline; text-underline-offset: 2px; }
+        #about a:hover { color: #fff; }
+        #about a:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; border-radius: 2px; }
         .font-digital {
             font-family: 'Share Tech Mono', monospace;
             font-variant-numeric: tabular-nums;
@@ -352,7 +428,7 @@
 </head>
 <body class="text-white select-none">
 
-    <h1 class="sr-only">ClassTimr - Classroom Countdown Timer</h1>
+    <h1 class="sr-only">Timr — free full-screen classroom timer</h1>
     <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
     <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0" aria-hidden="true"></canvas>
     <div id="flash-overlay" aria-hidden="true"></div>
@@ -434,6 +510,52 @@
             </div>
         </div>
     </div>
+
+    <!-- What Timr is, for search engines and for anyone who scrolls. It sits
+         below the first screen (main is min-h-screen), so the timer is always
+         what a teacher sees first, and it is display:none in fullscreen (see
+         the #about CSS). It is plain text and links on purpose: no aria-live,
+         so only the timer announces, and no <details>, because the global
+         Space shortcut would swallow Space on a <summary>. It comes last in
+         the DOM so Tab reaches the timer controls before these links. -->
+    <section id="about" aria-labelledby="about-title">
+        <div class="about-inner">
+            <h2 id="about-title">A classroom timer the back row can read</h2>
+            <p>Timr is a free, full-screen timer for your classroom. Put it on the projector, pick a time, and press Space.</p>
+            <p>I teach full-time. I built Timr because every timer I found online was buried in ads and too small for the back row. My class needed one they could all read at a glance.</p>
+
+            <h2>What it does</h2>
+            <ul>
+                <li>Countdown timer with 1, 5, 10 and 15 minute presets, or any custom time.</li>
+                <li>Stopwatch, and a full-screen clock.</li>
+                <li>Eleven animated themes, from Space Explorer to Tranquil Koi.</li>
+                <li>Fills a projector or classroom TV. Press F for full screen.</li>
+                <li>The numbers turn red for the last ten seconds.</li>
+                <li>Keyboard shortcuts: Space to start or pause, R to reset, F for full screen.</li>
+                <li>No sign-up and no ads. Nothing is stored on a server.</li>
+            </ul>
+
+            <h2>Questions teachers ask</h2>
+            <h3>Is Timr really free?</h3>
+            <p>Yes. No ads, no account, no trial. It's one of the Classhelpr tools I make for my own classroom and share with other teachers.</p>
+            <h3>Does it make a sound when time is up?</h3>
+            <p>No. The numbers turn red for the last ten seconds and the screen flashes at zero. If your device is set to reduce motion, the flash is skipped.</p>
+            <h3>Will it work on my projector or smartboard?</h3>
+            <p>Yes. It runs in any modern browser. Open it on the computer connected to your projector or TV, then press F or the Fullscreen button.</p>
+            <h3>Do I need to install anything or sign up?</h3>
+            <p>No. It's a web page. Open timr.classhelpr.com and it's ready.</p>
+            <h3>What does Timr store about me or my class?</h3>
+            <p>Nothing. Timr has no accounts, no analytics and no trackers, and it sends nothing once the page has loaded. The only thing it remembers is the theme you picked, and that stays in your own browser.</p>
+            <h3>Can I set a time longer than 15 minutes?</h3>
+            <p>Yes. Press Custom and type the minutes and seconds you want, up to 999 minutes.</p>
+
+            <h2>More free tools for teachers</h2>
+            <ul>
+                <li><a href="https://mapr.classhelpr.com">ClassMapr</a> — seating charts for the room you actually teach in. Free, no account.</li>
+                <li><a href="https://classhelpr.com">Classhelpr</a> — every tool, and what I'm building next.</li>
+            </ul>
+        </div>
+    </section>
 
     <script>
         // --- 1. TIMER LOGIC ---
@@ -523,7 +645,7 @@
                 ? hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0')
                 : minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
             timeDisplay.textContent = formattedTime;
-            document.title = `${formattedTime} - ClassTimr`;
+            document.title = `${formattedTime} - Timr`;
 
             if (!isStopwatchMode) {
                 if (timeRemaining <= 10 && timeRemaining > 0) {
@@ -551,7 +673,7 @@
             hours = hours % 12 || 12;
             const formattedTime = hours.toString().padStart(2, '0') + ':' + minutes + ':' + seconds;
             timeDisplay.textContent = formattedTime;
-            document.title = `${formattedTime} ${ampm} - ClassTimr`;
+            document.title = `${formattedTime} ${ampm} - Timr`;
         }
 
         // Clears every trace of a finished countdown: the pulsing digits, the
@@ -797,7 +919,13 @@
             closeCustomTimeModal();
         }
 
+        // The first paint keeps the page's real <title>. updateDisplay writes
+        // "15:00 - Timr" into the tab, which is right once a teacher is using
+        // it, but search engines read the title after scripts run, so doing it
+        // at load put "15:00" in search results instead of the page name.
+        const pageTitle = document.title;
         updateDisplay();
+        document.title = pageTitle;
 
         // --- 2. CONTROL ISLAND ---
         // The pill is always on screen. The full bar opens on hover, focus or

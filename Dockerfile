@@ -16,6 +16,11 @@ COPY fonts/ /usr/share/nginx/html/fonts/
 COPY favicon.ico /usr/share/nginx/html/favicon.ico
 COPY icon.png /usr/share/nginx/html/icon.png
 COPY apple-touch-icon.png /usr/share/nginx/html/apple-touch-icon.png
+# Search and share files, same rule: each one needs its own line here or it
+# 404s in production while working fine under `npm run dev`.
+COPY og.png /usr/share/nginx/html/og.png
+COPY robots.txt /usr/share/nginx/html/robots.txt
+COPY sitemap.xml /usr/share/nginx/html/sitemap.xml
 
 EXPOSE 8080
 
