@@ -213,50 +213,12 @@
             .md\:w-1\/4 { width: 25%; }
             .md\:w-2\/4 { width: 50%; }
         }
-        /* The page scrolls vertically so the #about section below the timer is
-           reachable, but never in fullscreen: that is the projector view, and
-           it must be the timer and nothing else. The fullscreen rules are
-           written out separately because one unknown prefixed selector in a
-           list would drop the whole rule. display-mode covers browser
-           fullscreen (F11), which :fullscreen does not match. */
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
-            overflow-x: hidden;
-            overflow-y: auto;
+            overflow: hidden;
             background-color: #000;
         }
-        html:fullscreen body { overflow: hidden; }
-        html:fullscreen #about { display: none; }
-        html:-webkit-full-screen body { overflow: hidden; }
-        html:-webkit-full-screen #about { display: none; }
-        @media (display-mode: fullscreen) {
-            body { overflow: hidden; }
-            #about { display: none; }
-        }
-
-        /* Crawlable "about" content below the first screen. Opaque so the
-           animated canvas behind it doesn't fight the text. */
-        #about {
-            position: relative;
-            z-index: 10;
-            background: #111827;
-            color: #e5e7eb;
-            user-select: text;
-            -webkit-user-select: text;
-            padding: 4rem 1.5rem 5rem;
-            line-height: 1.6;
-        }
-        #about .about-inner { max-width: 70ch; margin: 0 auto; }
-        #about h2 { font-size: 1.75rem; font-weight: 700; color: #fff; margin: 2.5rem 0 0.75rem; }
-        #about h2:first-child { margin-top: 0; }
-        #about h3 { font-size: 1.125rem; font-weight: 600; color: #fff; margin: 1.5rem 0 0.25rem; }
-        #about p { margin: 0 0 1rem; }
-        #about ul { margin: 0 0 1rem; padding-left: 1.25rem; list-style: disc; }
-        #about li { margin: 0.25rem 0; }
-        #about a { color: #c4b5fd; text-decoration: underline; text-underline-offset: 2px; }
-        #about a:hover { color: #fff; }
-        #about a:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; border-radius: 2px; }
         .font-digital {
             font-family: 'Share Tech Mono', monospace;
             font-variant-numeric: tabular-nums;
@@ -532,52 +494,6 @@
             </div>
         </div>
     </div>
-
-    <!-- What Timr is, for search engines and for anyone who scrolls. It sits
-         below the first screen (main is min-h-screen), so the timer is always
-         what a teacher sees first, and it is display:none in fullscreen (see
-         the #about CSS). It is plain text and links on purpose: no aria-live,
-         so only the timer announces, and no <details>, because the global
-         Space shortcut would swallow Space on a <summary>. It comes last in
-         the DOM so Tab reaches the timer controls before these links. -->
-    <section id="about" aria-labelledby="about-title">
-        <div class="about-inner">
-            <h2 id="about-title">A classroom timer the back row can read</h2>
-            <p>Timr is a free, full-screen timer for your classroom. Put it on the projector, pick a time, and press Space.</p>
-            <p>I teach full-time. I built Timr because every timer I found online was buried in ads and too small for the back row. My class needed one they could all read at a glance.</p>
-
-            <h2>What it does</h2>
-            <ul>
-                <li>Countdown timer with 1, 5, 10 and 15 minute presets, or any custom time.</li>
-                <li>Stopwatch, and a full-screen clock.</li>
-                <li>Eleven animated themes, from Space Explorer to Tranquil Koi.</li>
-                <li>Fills a projector or classroom TV. Press F for full screen.</li>
-                <li>The numbers turn red for the last ten seconds.</li>
-                <li>Keyboard shortcuts: Space to start or pause, R to reset, F for full screen.</li>
-                <li>No sign-up and no ads. Nothing is stored on a server.</li>
-            </ul>
-
-            <h2>Questions teachers ask</h2>
-            <h3>Is Timr really free?</h3>
-            <p>Yes. No ads, no account, no trial. It's one of the Classhelpr tools I make for my own classroom and share with other teachers.</p>
-            <h3>Does it make a sound when time is up?</h3>
-            <p>No. The numbers turn red for the last ten seconds and the screen flashes at zero. If your device is set to reduce motion, the flash is skipped.</p>
-            <h3>Will it work on my projector or smartboard?</h3>
-            <p>Yes. It runs in any modern browser. Open it on the computer connected to your projector or TV, then press F or the Fullscreen button.</p>
-            <h3>Do I need to install anything or sign up?</h3>
-            <p>No. It's a web page. Open timr.classhelpr.com and it's ready.</p>
-            <h3>What does Timr store about me or my class?</h3>
-            <p>Nothing. Timr has no accounts, no analytics and no trackers, and it sends nothing once the page has loaded. The only thing it remembers is the theme you picked, and that stays in your own browser.</p>
-            <h3>Can I set a time longer than 15 minutes?</h3>
-            <p>Yes. Press Custom and type the minutes and seconds you want, up to 999 minutes.</p>
-
-            <h2>More free tools for teachers</h2>
-            <ul>
-                <li><a href="https://mapr.classhelpr.com">ClassMapr</a> — seating charts for the room you actually teach in. Free, no account.</li>
-                <li><a href="https://classhelpr.com">Classhelpr</a> — every tool, and what I'm building next.</li>
-            </ul>
-        </div>
-    </section>
 
     <script>
         // --- 1. TIMER LOGIC ---

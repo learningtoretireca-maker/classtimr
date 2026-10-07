@@ -34,20 +34,8 @@ test.describe("search and share metadata", () => {
     await expect(page.locator("h1")).toHaveCount(1);
   });
 
-  test("the about section starts below the first screen", async ({ page }) => {
-    const viewport = page.viewportSize()!;
-    const top = await page
-      .locator("#about")
-      .evaluate((el) => el.getBoundingClientRect().top);
-    expect(top).toBeGreaterThanOrEqual(viewport.height);
-  });
-
-  test("the about section is gone in fullscreen", async ({ page }) => {
-    await page.keyboard.press("f");
-    await expect
-      .poll(() => page.evaluate(() => document.fullscreenElement !== null))
-      .toBe(true);
-    await expect(page.locator("#about")).toBeHidden();
+  test("the page is the timer only: no text below it, no scrolling", async ({ page }) => {
+    await expect(page.locator("#about")).toHaveCount(0);
     const overflow = await page.evaluate(() => getComputedStyle(document.body).overflowY);
     expect(overflow).toBe("hidden");
   });
