@@ -341,6 +341,7 @@
         .theme-menu button:hover,
         .theme-menu button:focus-visible { background: #374151; }
         .theme-menu button[aria-current="true"] { background: #9333ea; color: #fff; }
+        .theme-tag { margin-left: auto; padding: 0.0625rem 0.5rem; border-radius: 9999px; background: #fbbf24; color: #1c1917; font-size: 0.6875rem; font-weight: 700; }
 
         /* Dynamic-island controls: a small pill at top centre that morphs into
            the full bar on hover, focus or click, and back after 3s idle. The
@@ -1336,6 +1337,861 @@
             }
         }
 
+        // --- SEASONAL SCENES ---
+        // Falling Leaves and Midnight Candles are whole scenes rather than
+        // particle recipes, so each keeps its own state and draws itself.
+        // initParticles() and drawFrame() hand over to them by theme name.
+        const SEASONAL_SCENES = (() => {
+            // --- helpers ---
+            function randomBetween(low, high) {
+                return low + Math.random() * (high - low);
+            }
+
+            function pickFrom(list) {
+                return list[Math.floor(Math.random() * list.length)];
+            }
+
+            function fillVerticalGradient(context, width, height, stops) {
+                const gradient = context.createLinearGradient(0, 0, 0, height);
+                stops.forEach(stop => gradient.addColorStop(stop[0], stop[1]));
+                context.fillStyle = gradient;
+                context.fillRect(0, 0, width, height);
+            }
+
+            function fillGlow(context, centreX, centreY, radius, innerColour) {
+                const gradient = context.createRadialGradient(centreX, centreY, 0, centreX, centreY, radius);
+                gradient.addColorStop(0, innerColour);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                context.fillStyle = gradient;
+                context.fillRect(centreX - radius, centreY - radius, radius * 2, radius * 2);
+            }
+
+            function createStars(count, width, lowestY) {
+                const stars = [];
+                for (let index = 0; index < count; index++) {
+                    stars.push({
+                        x: Math.random() * width,
+                        y: Math.random() * lowestY,
+                        radius: randomBetween(0.4, 1.4),
+                        twinklePhase: Math.random() * Math.PI * 2,
+                        twinkleSpeed: randomBetween(0.6, 2.2)
+                    });
+                }
+                return stars;
+            }
+
+            function drawStars(context, stars, seconds, unit) {
+                context.fillStyle = '#fff';
+                stars.forEach(star => {
+                    context.globalAlpha = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(seconds * star.twinkleSpeed + star.twinklePhase));
+                    context.beginPath();
+                    context.arc(star.x, star.y, star.radius * unit, 0, Math.PI * 2);
+                    context.fill();
+                });
+                context.globalAlpha = 1;
+            }
+
+            // --- Falling Leaves ---
+            const MAPLE_HALF_OUTLINE = [
+                [0, -1], [0.17, -0.68], [0.33, -0.76], [0.26, -0.3], [0.52, -0.52], [0.58, -0.38],
+                [0.88, -0.44], [0.78, -0.14], [0.9, -0.06], [0.5, 0.26], [0.56, 0.44], [0.06, 0.36], [0.05, 0.9]
+            ];
+
+            function buildMapleLeafPath() {
+                const path = new Path2D();
+                path.moveTo(MAPLE_HALF_OUTLINE[0][0], MAPLE_HALF_OUTLINE[0][1]);
+                MAPLE_HALF_OUTLINE.forEach(point => path.lineTo(point[0], point[1]));
+                for (let index = MAPLE_HALF_OUTLINE.length - 1; index >= 0; index--) {
+                    path.lineTo(-MAPLE_HALF_OUTLINE[index][0], MAPLE_HALF_OUTLINE[index][1]);
+                }
+                path.closePath();
+                return path;
+            }
+
+            function buildOvalLeafPath() {
+                const path = new Path2D();
+                path.moveTo(0, -1);
+                path.quadraticCurveTo(0.75, -0.25, 0, 1);
+                path.quadraticCurveTo(-0.75, -0.25, 0, -1);
+                path.closePath();
+                return path;
+            }
+
+            function createLeavesScene() {
+                const leafColours = ['#e8590c', '#f08c00', '#fab005', '#d9480f', '#c2410c', '#b91c1c', '#eab308'];
+                const maplePath = buildMapleLeafPath();
+                const ovalPath = buildOvalLeafPath();
+                let leaves = [];
+                let unit = 1;
+
+                function placeLeaf(leaf, width, height, startAnywhere) {
+                    leaf.x = randomBetween(-0.1, 1.05) * width;
+                    if (startAnywhere) {
+                        leaf.y = Math.random() * height;
+                    } else {
+                        leaf.y = -leaf.size * 2;
+                    }
+                }
+
+                function makeLeaf(width, height) {
+                    const depth = Math.random();
+                    const leaf = {
+                        size: (7 + depth * 15) * unit,
+                        fallSpeed: (24 + depth * 52) * unit,
+                        driftSpeed: (6 + depth * 14) * unit,
+                        swayPhase: Math.random() * Math.PI * 2,
+                        swaySpeed: randomBetween(0.6, 1.4),
+                        swayWidth: randomBetween(14, 46) * unit,
+                        rotation: Math.random() * Math.PI * 2,
+                        rotationSpeed: randomBetween(-1.1, 1.1),
+                        flipPhase: Math.random() * Math.PI * 2,
+                        flipSpeed: randomBetween(0.7, 2),
+                        colour: pickFrom(leafColours),
+                        alpha: 0.4 + depth * 0.55,
+                        isMaple: Math.random() < 0.6
+                    };
+                    placeLeaf(leaf, width, height, true);
+                    return leaf;
+                }
+
+                return {
+                    resize(width, height) {
+                        unit = height / 720;
+                        leaves = [];
+                        for (let index = 0; index < 70; index++) leaves.push(makeLeaf(width, height));
+                        leaves.sort((first, second) => first.size - second.size);
+                    },
+                    draw(context, width, height, seconds, deltaSeconds) {
+                        fillVerticalGradient(context, width, height, [[0, '#110912'], [0.6, '#27100f'], [1, '#4a1f0b']]);
+                        fillGlow(context, width * 0.5, height * 1.05, height * 0.75, 'rgba(240, 140, 0, 0.2)');
+
+                        leaves.forEach(leaf => {
+                            leaf.y += leaf.fallSpeed * deltaSeconds;
+                            leaf.x += leaf.driftSpeed * deltaSeconds;
+                            leaf.rotation += leaf.rotationSpeed * deltaSeconds;
+                            if (leaf.y > height + leaf.size * 2) placeLeaf(leaf, width, height, false);
+
+                            const swayX = Math.sin(seconds * leaf.swaySpeed + leaf.swayPhase) * leaf.swayWidth;
+                            context.save();
+                            context.translate(leaf.x + swayX, leaf.y);
+                            context.rotate(leaf.rotation);
+                            context.scale(leaf.size * Math.cos(seconds * leaf.flipSpeed + leaf.flipPhase), leaf.size);
+                            context.globalAlpha = leaf.alpha;
+                            context.fillStyle = leaf.colour;
+                            if (leaf.isMaple) {
+                                context.fill(maplePath);
+                            } else {
+                                context.fill(ovalPath);
+                            }
+                            context.restore();
+                        });
+                        context.globalAlpha = 1;
+                    }
+                };
+            }
+
+            // --- Midnight Candles ---
+            // The trees and table are drawn once from a fixed seed, so the scene is
+            // the same every time it opens.
+            function createSeededRandom(seed) {
+                let state = seed;
+                return function nextRandom() {
+                    state = (state + 0x6D2B79F5) | 0;
+                    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+                    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+                    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+                };
+            }
+
+            function smoothStep(progress) {
+                return progress * progress * (3 - 2 * progress);
+            }
+
+            // A crooked limb: three kinked pieces, then it forks in two.
+            function growTwisted(random, segments, tips, startX, startY, length, angle, thickness, depth) {
+                let currentX = startX;
+                let currentY = startY;
+                let heading = angle;
+                const pieceCount = 3;
+                for (let piece = 0; piece < pieceCount; piece++) {
+                    heading += (random() - 0.5) * 0.56;
+                    const nextX = currentX + Math.cos(heading) * length / pieceCount;
+                    const nextY = currentY + Math.sin(heading) * length / pieceCount;
+                    segments.push({ startX: currentX, startY: currentY, endX: nextX, endY: nextY, thickness: thickness * (1 - 0.1 * piece) });
+                    currentX = nextX;
+                    currentY = nextY;
+                }
+                if (depth === 0) {
+                    tips.push({ x: currentX, y: currentY });
+                    return;
+                }
+                [-1, 1].forEach(side => {
+                    const childLength = length * (0.66 + random() * 0.16);
+                    const childAngle = heading + side * (0.3 + random() * 0.45);
+                    growTwisted(random, segments, tips, currentX, currentY, childLength, childAngle, thickness * 0.66, depth - 1);
+                });
+            }
+
+            const CANDLE_SPOTS = [
+                { at: 0.045, wide: 0.055, tall: 0.06, sink: 0.05 },
+                { at: 0.097, wide: 0.075, tall: 0.14, sink: 0.04 },
+                { at: 0.17, wide: 0.07, tall: 0.085, sink: 0.055 },
+                { at: 0.84, wide: 0.078, tall: 0.13, sink: 0.04 },
+                { at: 0.925, wide: 0.068, tall: 0.085, sink: 0.055 }
+            ];
+
+            function createMidnightCandlesScene() {
+                let unit = 1;
+                let tableTopY = 0;
+                let moon = { x: 0, y: 0, radius: 0, blotches: [] };
+                let stars = [];
+                let clouds = [];
+                let bats = [];
+                let crows = [];
+                let candles = [];
+                let staticLayer = null;
+
+                // ----- trees, shrubs and the table: painted once -----
+                function buildTree(random, segments, tips, baseX, direction, width, height) {
+                    let currentX = baseX;
+                    let currentY = height * 0.86;
+                    let heading = -Math.PI / 2 + direction * 0.22;
+                    let thickness = height * 0.06;
+                    let perchStart = null;
+                    for (let piece = 0; piece < 5; piece++) {
+                        heading += direction * (random() * 0.34 - 0.2);
+                        const nextX = currentX + Math.cos(heading) * height * 0.07;
+                        const nextY = currentY + Math.sin(heading) * height * 0.07;
+                        segments.push({ startX: currentX, startY: currentY, endX: nextX, endY: nextY, thickness });
+                        currentX = nextX;
+                        currentY = nextY;
+                        thickness *= 0.88;
+                        if (piece === 3) perchStart = { x: currentX, y: currentY };
+                    }
+                    growTwisted(random, segments, tips, currentX, currentY, height * 0.2, -Math.PI / 2 + direction * 0.65, thickness * 0.7, 5);
+                    growTwisted(random, segments, tips, currentX, currentY, height * 0.19, -Math.PI / 2 - direction * 0.2, thickness * 0.62, 5);
+
+                    // The limb a crow sits on: it reaches inward and sags a little.
+                    const perchEnd = { x: perchStart.x + direction * width * 0.13, y: perchStart.y - height * 0.06 };
+                    const sagPoint = { x: (perchStart.x + perchEnd.x) / 2, y: (perchStart.y + perchEnd.y) / 2 + height * 0.035 };
+                    function pointOnPerch(fraction) {
+                        const away = 1 - fraction;
+                        return {
+                            x: away * away * perchStart.x + 2 * away * fraction * sagPoint.x + fraction * fraction * perchEnd.x,
+                            y: away * away * perchStart.y + 2 * away * fraction * sagPoint.y + fraction * fraction * perchEnd.y
+                        };
+                    }
+                    const perchPieces = 7;
+                    let previous = perchStart;
+                    for (let piece = 1; piece <= perchPieces; piece++) {
+                        const point = pointOnPerch(piece / perchPieces);
+                        segments.push({ startX: previous.x, startY: previous.y, endX: point.x, endY: point.y, thickness: height * (0.017 - 0.008 * piece / perchPieces) });
+                        previous = point;
+                    }
+                    growTwisted(random, segments, tips, perchEnd.x, perchEnd.y, height * 0.045, Math.atan2(-0.4, direction), height * 0.007, 2);
+
+                    const seat = pointOnPerch(0.62);
+                    const ahead = pointOnPerch(0.7);
+                    return { x: seat.x, y: seat.y - height * 0.006, slope: (ahead.y - seat.y) / (ahead.x - seat.x) };
+                }
+
+                function paintTable(layer, random, width, height) {
+                    const boards = layer.createLinearGradient(0, tableTopY, 0, height);
+                    boards.addColorStop(0, '#1c5153');
+                    boards.addColorStop(0.35, '#2a3b38');
+                    boards.addColorStop(1, '#3a2318');
+                    layer.fillStyle = boards;
+                    layer.fillRect(0, tableTopY, width, height - tableTopY);
+
+                    // Planks run toward the viewer and fan out as they come closer.
+                    const vanishX = width * 0.5;
+                    const fanOut = 1.6;
+                    const plankCount = 14;
+                    const tableDepth = height - tableTopY;
+                    for (let plank = 0; plank <= plankCount; plank++) {
+                        const topX = (plank / plankCount) * width;
+                        const bottomX = vanishX + (topX - vanishX) * fanOut;
+                        layer.fillStyle = 'rgba(3, 8, 10, 0.85)';
+                        layer.beginPath();
+                        layer.moveTo(topX - unit, tableTopY);
+                        layer.lineTo(topX + unit, tableTopY);
+                        layer.lineTo(bottomX + 3 * unit, height);
+                        layer.lineTo(bottomX - 3 * unit, height);
+                        layer.fill();
+
+                        for (let streak = 0; streak < 4; streak++) {
+                            const grainTopX = topX + random() * (width / plankCount);
+                            const grainBottomX = vanishX + (grainTopX - vanishX) * fanOut;
+                            const nearEnd = random() * 0.6;
+                            const farEnd = Math.min(1, nearEnd + 0.2 + random() * 0.4);
+                            if (random() < 0.6) {
+                                layer.strokeStyle = 'rgba(0, 0, 0, 0.24)';
+                            } else {
+                                layer.strokeStyle = 'rgba(170, 230, 220, 0.08)';
+                            }
+                            layer.lineWidth = 1.2 * unit * (1 + nearEnd);
+                            layer.beginPath();
+                            layer.moveTo(grainTopX + (grainBottomX - grainTopX) * nearEnd, tableTopY + tableDepth * nearEnd);
+                            layer.lineTo(grainTopX + (grainBottomX - grainTopX) * farEnd, tableTopY + tableDepth * farEnd);
+                            layer.stroke();
+                        }
+                    }
+                    layer.fillStyle = 'rgba(130, 230, 215, 0.45)';
+                    layer.fillRect(0, tableTopY, width, 1.5 * unit);
+                }
+
+                function paintStaticLayer(width, height) {
+                    const random = createSeededRandom(20261031);
+                    staticLayer = document.createElement('canvas');
+                    staticLayer.width = width;
+                    staticLayer.height = height;
+                    const layer = staticLayer.getContext('2d');
+                    layer.lineCap = 'round';
+
+                    const segments = [];
+                    const tips = [];
+                    [0.215, 0.25, 0.37, 0.56, 0.62, 0.68, 0.74, 0.79].forEach(spot => {
+                        const twigLength = height * (0.03 + random() * 0.02);
+                        growTwisted(random, segments, tips, spot * width, tableTopY + 4 * unit, twigLength, -Math.PI / 2 + (random() - 0.5) * 0.5, 4 * unit, 4);
+                    });
+                    const leftPerch = buildTree(random, segments, tips, width * 0.005, 1, width, height);
+                    const rightPerch = buildTree(random, segments, tips, width * 0.995, -1, width, height);
+                    growTwisted(random, segments, tips, width * 0.1, -0.03 * height, 0.13 * height, 0.5, 0.02 * height, 4);
+                    growTwisted(random, segments, tips, width * 0.9, -0.03 * height, 0.13 * height, Math.PI - 0.5, 0.02 * height, 4);
+
+                    layer.strokeStyle = '#080a0d';
+                    segments.forEach(segment => {
+                        layer.lineWidth = Math.max(0.8, segment.thickness);
+                        layer.beginPath();
+                        layer.moveTo(segment.startX, segment.startY);
+                        layer.lineTo(segment.endX, segment.endY);
+                        layer.stroke();
+                    });
+                    // A little candle-warmth on the bark of the thick limbs.
+                    layer.strokeStyle = 'rgba(150, 62, 30, 0.3)';
+                    segments.forEach(segment => {
+                        if (segment.thickness < 7 * unit) return;
+                        layer.lineWidth = segment.thickness * 0.28;
+                        layer.beginPath();
+                        layer.moveTo(segment.startX, segment.startY);
+                        layer.lineTo(segment.endX, segment.endY);
+                        layer.stroke();
+                    });
+                    // The last few leaves still hanging on.
+                    layer.fillStyle = 'rgba(235, 95, 35, 0.85)';
+                    tips.forEach(tip => {
+                        if (random() > 0.14) return;
+                        layer.beginPath();
+                        layer.ellipse(tip.x, tip.y, 3.2 * unit, 1.8 * unit, random() * Math.PI, 0, Math.PI * 2);
+                        layer.fill();
+                    });
+
+                    paintTable(layer, random, width, height);
+                    return { leftPerch, rightPerch };
+                }
+
+                // ----- sky -----
+                function makeCloud(random, centreX, centreY, reach, tint, speed) {
+                    const puffs = [];
+                    const puffCount = 8;
+                    for (let index = 0; index < puffCount; index++) {
+                        const along = index / (puffCount - 1);
+                        const hump = Math.sin(along * Math.PI);
+                        const radius = reach * (0.14 + 0.24 * hump) * (0.75 + random() * 0.5);
+                        puffs.push({ offsetX: (along - 0.5) * 2 * reach, offsetY: -radius * 0.5 * random() * hump, radius });
+                    }
+                    return { x: centreX, y: centreY, reach, puffs, tint, speed };
+                }
+
+                function fillCloudPuffs(context, cloud, colour, raise) {
+                    const tallest = cloud.reach * 0.5;
+                    const fade = context.createLinearGradient(0, -tallest, 0, tallest * 0.7);
+                    fade.addColorStop(0, 'rgba(' + colour + ', 0.92)');
+                    fade.addColorStop(1, 'rgba(' + colour + ', 0)');
+                    context.fillStyle = fade;
+                    context.beginPath();
+                    cloud.puffs.forEach(puff => {
+                        const puffY = puff.offsetY - puff.radius * raise;
+                        context.moveTo(puff.offsetX + puff.radius, puffY);
+                        context.arc(puff.offsetX, puffY, puff.radius, 0, Math.PI * 2);
+                    });
+                    context.fill();
+                }
+
+                function drawMoon(context) {
+                    fillGlow(context, moon.x, moon.y, moon.radius * 4.6, 'rgba(80, 230, 210, 0.42)');
+                    const face = context.createRadialGradient(moon.x - moon.radius * 0.25, moon.y - moon.radius * 0.25, moon.radius * 0.1, moon.x, moon.y, moon.radius);
+                    face.addColorStop(0, '#fdfdd9');
+                    face.addColorStop(0.7, '#e3f0a5');
+                    face.addColorStop(1, '#b7dc9a');
+                    context.save();
+                    context.beginPath();
+                    context.arc(moon.x, moon.y, moon.radius, 0, Math.PI * 2);
+                    context.fillStyle = face;
+                    context.fill();
+                    context.clip();
+                    context.fillStyle = 'rgba(96, 170, 140, 0.33)';
+                    moon.blotches.forEach(blotch => {
+                        context.beginPath();
+                        context.arc(moon.x + blotch.offsetX * moon.radius, moon.y + blotch.offsetY * moon.radius, blotch.radius * moon.radius, 0, Math.PI * 2);
+                        context.fill();
+                    });
+                    context.restore();
+                }
+
+                function drawBatShape(context, size, flap) {
+                    const tipY = -flap * size * 0.7;
+                    [-1, 1].forEach(side => {
+                        context.beginPath();
+                        context.moveTo(0, -size * 0.1);
+                        context.quadraticCurveTo(side * size * 0.8, -size * 0.5 + tipY * 0.6, side * size * 1.7, tipY);
+                        context.quadraticCurveTo(side * size * 1.35, tipY * 0.6 + size * 0.25, side * size * 1.15, tipY * 0.5 + size * 0.5);
+                        context.quadraticCurveTo(side * size * 0.9, tipY * 0.3 + size * 0.15, side * size * 0.6, tipY * 0.2 + size * 0.45);
+                        context.quadraticCurveTo(side * size * 0.35, size * 0.1, 0, size * 0.3);
+                        context.closePath();
+                        context.fill();
+                        context.beginPath();
+                        context.moveTo(side * size * 0.05, -size * 0.3);
+                        context.lineTo(side * size * 0.2, -size * 0.58);
+                        context.lineTo(side * size * 0.22, -size * 0.2);
+                        context.closePath();
+                        context.fill();
+                    });
+                    context.beginPath();
+                    context.ellipse(0, 0, size * 0.22, size * 0.36, 0, 0, Math.PI * 2);
+                    context.fill();
+                }
+
+                // ----- crows -----
+                function makeCrow(homeX, homeY, slope, facing, size, roamReach, canPeck) {
+                    return {
+                        homeX, homeY, slope, facing, size, roamReach, canPeck,
+                        offsetX: 0, hopFrom: 0, hopTo: 0, lift: 0,
+                        action: 'idle', actionAge: 0, actionLength: randomBetween(0.4, 2),
+                        lookTarget: 0, headTurn: 0, tiltTarget: 0, headTilt: 0,
+                        wingLift: 0, beakOpen: 0, bodyDip: 0, tailFlick: 0,
+                        breathPhase: Math.random() * Math.PI * 2
+                    };
+                }
+
+                function startCrowAction(crow, action, length) {
+                    crow.action = action;
+                    crow.actionAge = 0;
+                    crow.actionLength = length;
+                }
+
+                function chooseCrowAction(crow) {
+                    const roll = Math.random();
+                    if (crow.canPeck && roll < 0.22) {
+                        crow.lookTarget = 0;
+                        startCrowAction(crow, 'peck', 1.3);
+                        return;
+                    }
+                    if (roll < 0.45) {
+                        crow.lookTarget = 0;
+                        if (Math.random() < 0.45) crow.lookTarget = 1;
+                        crow.tiltTarget = randomBetween(-0.35, 0.3);
+                        startCrowAction(crow, 'look', randomBetween(0.5, 1.4));
+                        return;
+                    }
+                    if (roll < 0.62) {
+                        crow.tiltTarget = randomBetween(-0.5, 0.45);
+                        startCrowAction(crow, 'look', randomBetween(0.3, 0.8));
+                        return;
+                    }
+                    if (roll < 0.76) {
+                        const hopLength = pickFrom([-1, 1]) * randomBetween(0.5, 1.1) * crow.size;
+                        crow.hopFrom = crow.offsetX;
+                        crow.hopTo = Math.max(-crow.roamReach, Math.min(crow.roamReach, crow.offsetX + hopLength));
+                        startCrowAction(crow, 'hop', 0.38);
+                        return;
+                    }
+                    if (roll < 0.88) {
+                        startCrowAction(crow, 'ruffle', 0.9);
+                        return;
+                    }
+                    if (roll < 0.95) {
+                        startCrowAction(crow, 'tail', 0.6);
+                        return;
+                    }
+                    crow.lookTarget = 0;
+                    startCrowAction(crow, 'caw', 1.1);
+                }
+
+                function updateCrow(crow, deltaSeconds) {
+                    crow.actionAge += deltaSeconds;
+                    const progress = Math.min(1, crow.actionAge / crow.actionLength);
+                    crow.wingLift = 0;
+                    crow.lift = 0;
+                    crow.beakOpen = 0;
+                    crow.bodyDip = 0;
+                    crow.tailFlick = 0;
+                    let tiltGoal = crow.tiltTarget;
+
+                    if (crow.action === 'hop') {
+                        crow.offsetX = crow.hopFrom + (crow.hopTo - crow.hopFrom) * smoothStep(progress);
+                        crow.lift = Math.sin(progress * Math.PI) * 0.4 * crow.size;
+                        crow.wingLift = Math.sin(progress * Math.PI) * 0.5;
+                    } else if (crow.action === 'ruffle') {
+                        crow.wingLift = Math.sin(progress * Math.PI) * (0.45 + 0.25 * Math.sin(crow.actionAge * 38));
+                    } else if (crow.action === 'tail') {
+                        crow.tailFlick = Math.sin(progress * Math.PI * 4) * 0.3;
+                    } else if (crow.action === 'peck') {
+                        crow.bodyDip = Math.abs(Math.sin(progress * Math.PI * 3));
+                        tiltGoal = 0.2;
+                    } else if (crow.action === 'caw') {
+                        crow.beakOpen = Math.abs(Math.sin(progress * Math.PI * 2));
+                        tiltGoal = -0.4;
+                    }
+
+                    // Birds move their heads in quick snaps, so these ease fast.
+                    crow.headTurn += (crow.lookTarget - crow.headTurn) * Math.min(1, deltaSeconds * 14);
+                    crow.headTilt += (tiltGoal - crow.headTilt) * Math.min(1, deltaSeconds * 16);
+
+                    if (progress >= 1) {
+                        if (crow.action === 'idle') {
+                            chooseCrowAction(crow);
+                        } else {
+                            startCrowAction(crow, 'idle', randomBetween(0.5, 2.4));
+                        }
+                    }
+                }
+
+                function drawCrow(context, crow, seconds) {
+                    context.save();
+                    context.translate(crow.homeX + crow.offsetX, crow.homeY + crow.offsetX * crow.slope - crow.lift);
+                    context.scale(crow.facing * crow.size, crow.size);
+                    context.fillStyle = '#05080c';
+                    context.strokeStyle = '#05080c';
+                    context.lineCap = 'round';
+
+                    context.lineWidth = 0.055;
+                    context.beginPath();
+                    context.moveTo(-0.1, 0);
+                    context.lineTo(-0.05, -0.45);
+                    context.moveTo(0.12, 0);
+                    context.lineTo(0.08, -0.45);
+                    context.moveTo(-0.2, 0);
+                    context.lineTo(0.26, 0);
+                    context.stroke();
+
+                    // Everything above the legs tips forward and back from the hips.
+                    context.translate(0, -0.45);
+                    context.rotate(-0.42 + crow.bodyDip * 1.1 + Math.sin(seconds * 2 + crow.breathPhase) * 0.02);
+
+                    context.save();
+                    context.translate(-0.42, -0.2);
+                    context.rotate(crow.tailFlick - 0.08);
+                    context.beginPath();
+                    context.moveTo(0, -0.1);
+                    context.lineTo(-0.8, -0.04);
+                    context.lineTo(-0.84, 0.12);
+                    context.lineTo(0, 0.13);
+                    context.closePath();
+                    context.fill();
+                    context.restore();
+
+                    context.beginPath();
+                    context.ellipse(0.1, -0.28, 0.62, 0.34, 0, 0, Math.PI * 2);
+                    context.fill();
+
+                    context.save();
+                    context.translate(0.64, -0.5);
+                    context.rotate(crow.headTilt);
+                    context.beginPath();
+                    context.arc(0, 0, 0.25, 0, Math.PI * 2);
+                    context.fill();
+                    context.scale(1 - 2 * crow.headTurn, 1);
+                    context.beginPath();
+                    context.moveTo(0.16, -0.12);
+                    context.lineTo(0.62, 0.02 - crow.beakOpen * 0.12);
+                    context.lineTo(0.16, 0.05);
+                    context.closePath();
+                    context.fill();
+                    context.beginPath();
+                    context.moveTo(0.16, 0.02);
+                    context.lineTo(0.55, 0.07 + crow.beakOpen * 0.18);
+                    context.lineTo(0.14, 0.15);
+                    context.closePath();
+                    context.fill();
+                    context.fillStyle = 'rgba(190, 255, 235, 0.9)';
+                    context.beginPath();
+                    context.arc(0.08, -0.07, 0.04, 0, Math.PI * 2);
+                    context.fill();
+                    context.restore();
+
+                    context.translate(0.38, -0.32);
+                    context.rotate(crow.wingLift * 0.9);
+                    context.fillStyle = '#0f1820';
+                    context.beginPath();
+                    context.moveTo(0.04, -0.04);
+                    context.quadraticCurveTo(-0.45, -0.22, -0.8, 0);
+                    context.lineTo(-1.12, 0.24);
+                    context.quadraticCurveTo(-0.5, 0.3, 0.02, 0.18);
+                    context.closePath();
+                    context.fill();
+                    context.restore();
+                }
+
+                // ----- candles -----
+                function updateFlame(flame, deltaSeconds) {
+                    flame.untilNextFlick -= deltaSeconds;
+                    if (flame.untilNextFlick <= 0) {
+                        flame.untilNextFlick = randomBetween(0.06, 0.2);
+                        flame.targetBrightness = randomBetween(0.7, 1);
+                        if (Math.random() < 0.07) flame.targetBrightness = randomBetween(0.4, 0.55);
+                        flame.targetLean = randomBetween(-1, 1);
+                    }
+                    flame.brightness += (flame.targetBrightness - flame.brightness) * Math.min(1, deltaSeconds * 12);
+                    flame.lean += (flame.targetLean - flame.lean) * Math.min(1, deltaSeconds * 5);
+                }
+
+                function drawCandleBody(context, candle) {
+                    const left = candle.x - candle.bodyWidth / 2;
+                    const top = candle.baseY - candle.bodyHeight;
+
+                    context.fillStyle = '#080808';
+                    context.beginPath();
+                    context.ellipse(candle.x, candle.baseY, candle.bodyWidth * 0.82, candle.bodyWidth * 0.2, 0, 0, Math.PI * 2);
+                    context.fill();
+
+                    // Wax glows near the flame and falls into shadow toward the base.
+                    const wax = context.createLinearGradient(0, top, 0, candle.baseY);
+                    wax.addColorStop(0, '#fff2b0');
+                    wax.addColorStop(0.3, '#f6cf63');
+                    wax.addColorStop(1, '#a8641f');
+                    context.fillStyle = wax;
+                    context.fillRect(left, top, candle.bodyWidth, candle.bodyHeight - candle.bodyWidth * 0.05);
+                    context.beginPath();
+                    context.ellipse(candle.x, candle.baseY - candle.bodyWidth * 0.05, candle.bodyWidth / 2, candle.bodyWidth * 0.14, 0, 0, Math.PI * 2);
+                    context.fill();
+
+                    const roundness = context.createLinearGradient(left, 0, left + candle.bodyWidth, 0);
+                    roundness.addColorStop(0, 'rgba(70, 30, 0, 0.45)');
+                    roundness.addColorStop(0.3, 'rgba(70, 30, 0, 0)');
+                    roundness.addColorStop(0.7, 'rgba(70, 30, 0, 0)');
+                    roundness.addColorStop(1, 'rgba(70, 30, 0, 0.45)');
+                    context.fillStyle = roundness;
+                    context.fillRect(left, top, candle.bodyWidth, candle.bodyHeight);
+
+                    context.strokeStyle = '#f9e08f';
+                    context.lineCap = 'round';
+                    candle.drips.forEach(drip => {
+                        const dripX = candle.x + drip.across * candle.bodyWidth;
+                        context.lineWidth = drip.thickness * candle.bodyWidth;
+                        context.beginPath();
+                        context.moveTo(dripX, top);
+                        context.lineTo(dripX, top + drip.length * candle.bodyHeight);
+                        context.stroke();
+                    });
+
+                    context.fillStyle = '#fff9d6';
+                    context.beginPath();
+                    context.ellipse(candle.x, top, candle.bodyWidth / 2, candle.bodyWidth * 0.15, 0, 0, Math.PI * 2);
+                    context.fill();
+
+                    context.strokeStyle = '#2a1608';
+                    context.lineWidth = candle.bodyWidth * 0.05;
+                    context.beginPath();
+                    context.moveTo(candle.x, top);
+                    context.lineTo(candle.x, top - candle.bodyWidth * 0.16);
+                    context.stroke();
+                }
+
+                function traceFlame(context, flameWidth, flameHeight, tipX, bulge) {
+                    context.beginPath();
+                    context.moveTo(0, 0);
+                    context.bezierCurveTo(-flameWidth * 1.25, -flameHeight * 0.05, -flameWidth * 1.1 + bulge, -flameHeight * 0.55, tipX, -flameHeight);
+                    context.bezierCurveTo(flameWidth * 1.1 + bulge, -flameHeight * 0.55, flameWidth * 1.25, -flameHeight * 0.05, 0, 0);
+                    context.closePath();
+                }
+
+                // A flame is a teardrop whose tip wanders. Three layers, like a real
+                // one: orange outside, pale yellow core, a touch of blue at the wick.
+                function drawFlame(context, candle, seconds) {
+                    const flame = candle.flame;
+                    const flameWidth = candle.bodyWidth * 0.2;
+                    const shiver = Math.sin(seconds * 13 + flame.phase) * 0.5 + Math.sin(seconds * 21.7 + flame.phase * 2) * 0.5;
+                    const flameHeight = candle.bodyWidth * (0.72 + 0.34 * flame.brightness + 0.06 * shiver);
+                    const tipX = (flame.lean * 1.4 + shiver * 0.5) * flameWidth;
+                    const bulge = flame.lean * flameWidth * 0.45;
+
+                    context.save();
+                    context.translate(candle.x, candle.baseY - candle.bodyHeight - candle.bodyWidth * 0.1);
+
+                    context.globalCompositeOperation = 'lighter';
+                    fillGlow(context, 0, -flameHeight * 0.45, flameHeight * 3.4, 'rgba(255, 160, 50, ' + (0.4 * flame.brightness).toFixed(3) + ')');
+                    fillGlow(context, 0, -flameHeight * 0.45, flameHeight * 1.2, 'rgba(255, 220, 130, ' + (0.5 * flame.brightness).toFixed(3) + ')');
+                    context.globalCompositeOperation = 'source-over';
+
+                    const outer = context.createLinearGradient(0, 0, 0, -flameHeight);
+                    outer.addColorStop(0, 'rgba(255, 110, 20, 0.95)');
+                    outer.addColorStop(0.45, '#ffb52e');
+                    outer.addColorStop(1, 'rgba(255, 232, 150, 0.9)');
+                    context.fillStyle = outer;
+                    traceFlame(context, flameWidth, flameHeight, tipX, bulge);
+                    context.fill();
+
+                    context.translate(0, -flameHeight * 0.06);
+                    context.fillStyle = '#fff8d6';
+                    traceFlame(context, flameWidth * 0.55, flameHeight * 0.62, tipX * 0.6, bulge * 0.6);
+                    context.fill();
+
+                    context.fillStyle = 'rgba(90, 150, 255, 0.5)';
+                    context.beginPath();
+                    context.ellipse(0, flameHeight * 0.02, flameWidth * 0.5, flameHeight * 0.09, 0, 0, Math.PI * 2);
+                    context.fill();
+                    context.restore();
+                }
+
+                function drawCandleLightOnTable(context, candle) {
+                    context.save();
+                    context.globalCompositeOperation = 'lighter';
+                    context.translate(candle.x, candle.baseY);
+                    context.scale(1, 0.3);
+                    fillGlow(context, 0, 0, candle.bodyWidth * 4.5, 'rgba(255, 150, 40, ' + (0.36 * candle.flame.brightness).toFixed(3) + ')');
+                    context.restore();
+                }
+
+                return {
+                    resize(width, height) {
+                        unit = height / 720;
+                        tableTopY = height * 0.81;
+                        const perches = paintStaticLayer(width, height);
+                        const random = createSeededRandom(1031);
+
+                        stars = createStars(80, width, height * 0.7);
+                        moon = { x: width * 0.83, y: height * 0.2, radius: height * 0.155, blotches: [] };
+                        for (let index = 0; index < 11; index++) {
+                            const angle = random() * Math.PI * 2;
+                            const distance = random() * 0.8;
+                            moon.blotches.push({ offsetX: Math.cos(angle) * distance, offsetY: Math.sin(angle) * distance, radius: 0.1 + random() * 0.24 });
+                        }
+
+                        const farTint = { rim: '16, 84, 90', body: '8, 56, 64' };
+                        const nearTint = { rim: '58, 176, 168', body: '14, 96, 102' };
+                        clouds = [];
+                        [[0.12, 0.2], [0.4, 0.14], [0.62, 0.34], [0.3, 0.44], [0.95, 0.46]].forEach(spot => {
+                            clouds.push(makeCloud(random, spot[0] * width, spot[1] * height, height * (0.16 + random() * 0.1), farTint, (3 + random() * 3) * unit));
+                        });
+                        [[0.05, 0.79], [0.3, 0.77], [0.52, 0.8], [0.74, 0.77], [0.96, 0.79]].forEach(spot => {
+                            clouds.push(makeCloud(random, spot[0] * width, spot[1] * height, height * (0.2 + random() * 0.08), nearTint, (6 + random() * 4) * unit));
+                        });
+
+                        bats = [];
+                        for (let index = 0; index < 9; index++) {
+                            bats.push({
+                                centreX: Math.random() * width,
+                                centreY: randomBetween(0.12, 0.46) * height,
+                                swingX: randomBetween(0.14, 0.36) * width,
+                                swingY: randomBetween(0.05, 0.13) * height,
+                                rateX: randomBetween(0.16, 0.34),
+                                rateY: randomBetween(0.3, 0.62),
+                                phaseX: Math.random() * Math.PI * 2,
+                                phaseY: Math.random() * Math.PI * 2,
+                                size: randomBetween(9, 19) * unit,
+                                flapSpeed: randomBetween(10, 15)
+                            });
+                        }
+                        // Two of them circle the moon.
+                        bats[0].centreX = moon.x;
+                        bats[0].centreY = moon.y;
+                        bats[0].swingX = height * 0.3;
+                        bats[1].centreX = moon.x - height * 0.1;
+                        bats[1].centreY = moon.y + height * 0.06;
+                        bats[1].swingX = height * 0.42;
+
+                        crows = [
+                            makeCrow(perches.leftPerch.x, perches.leftPerch.y, perches.leftPerch.slope, 1, height * 0.052, width * 0.02, false),
+                            makeCrow(perches.rightPerch.x, perches.rightPerch.y, perches.rightPerch.slope, -1, height * 0.052, width * 0.02, false),
+                            makeCrow(width * 0.3, tableTopY + 1.5 * unit, 0, 1, height * 0.05, width * 0.06, true)
+                        ];
+
+                        candles = CANDLE_SPOTS.map((spot, index) => {
+                            const drips = [];
+                            const dripCount = 5 + Math.floor(random() * 3);
+                            for (let drip = 0; drip < dripCount; drip++) {
+                                drips.push({ across: random() - 0.5, length: 0.15 + random() * 0.45, thickness: 0.1 + random() * 0.08 });
+                            }
+                            return {
+                                x: spot.at * width,
+                                baseY: tableTopY + spot.sink * height,
+                                bodyWidth: spot.wide * height,
+                                bodyHeight: spot.tall * height,
+                                drips,
+                                flame: { brightness: 0.9, targetBrightness: 0.9, lean: 0, targetLean: 0, untilNextFlick: Math.random() * 0.2, phase: index * 1.9 }
+                            };
+                        });
+                    },
+                    draw(context, width, height, seconds, deltaSeconds) {
+                        fillVerticalGradient(context, width, height, [[0, '#021b24'], [0.45, '#07353d'], [0.8, '#0b5258'], [1, '#0b5258']]);
+                        drawStars(context, stars, seconds, unit);
+                        drawMoon(context);
+
+                        clouds.forEach(cloud => {
+                            cloud.x += cloud.speed * deltaSeconds;
+                            if (cloud.x - cloud.reach * 1.4 > width) cloud.x = -cloud.reach * 1.4;
+                            context.save();
+                            context.translate(cloud.x, cloud.y);
+                            fillCloudPuffs(context, cloud, cloud.tint.rim, 0.14);
+                            fillCloudPuffs(context, cloud, cloud.tint.body, 0);
+                            context.restore();
+                        });
+
+                        context.fillStyle = '#04070b';
+                        bats.forEach(bat => {
+                            const swing = seconds * bat.rateX + bat.phaseX;
+                            const batX = bat.centreX + Math.sin(swing) * bat.swingX;
+                            const batY = bat.centreY + Math.sin(seconds * bat.rateY + bat.phaseY) * bat.swingY + Math.sin(seconds * bat.rateY * 2.3 + bat.phaseX) * bat.swingY * 0.4;
+                            context.save();
+                            context.translate(batX, batY);
+                            context.rotate(Math.cos(swing) * 0.35);
+                            drawBatShape(context, bat.size * (0.85 + 0.25 * Math.sin(seconds * 0.2 + bat.phaseY)), Math.sin(seconds * bat.flapSpeed + bat.phaseX));
+                            context.restore();
+                        });
+
+                        const longest = Math.max(width, height);
+                        const vignette = context.createRadialGradient(width / 2, height / 2, longest * 0.3, width / 2, height / 2, longest * 0.72);
+                        vignette.addColorStop(0, 'rgba(0, 8, 12, 0)');
+                        vignette.addColorStop(1, 'rgba(0, 8, 12, 0.6)');
+                        context.fillStyle = vignette;
+                        context.fillRect(0, 0, width, height);
+
+                        context.drawImage(staticLayer, 0, 0, width, height);
+
+                        crows.forEach(crow => {
+                            updateCrow(crow, deltaSeconds);
+                            drawCrow(context, crow, seconds);
+                        });
+
+                        candles.forEach(candle => {
+                            updateFlame(candle.flame, deltaSeconds);
+                            drawCandleLightOnTable(context, candle);
+                            drawCandleBody(context, candle);
+                            drawFlame(context, candle, seconds);
+                        });
+                    }
+                };
+            }
+
+            return { leaves: createLeavesScene(), candles: createMidnightCandlesScene() };
+        })();
+
+        let lastSeasonalFrame = null;
+
+        function drawSeasonalScene(scene) {
+            if (canvas.width === 0 || canvas.height === 0) return;
+            const seconds = performance.now() / 1000;
+            let deltaSeconds = 0;
+            if (lastSeasonalFrame !== null) deltaSeconds = Math.min(0.05, seconds - lastSeasonalFrame);
+            lastSeasonalFrame = seconds;
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+            scene.draw(ctx, canvas.width, canvas.height, seconds, deltaSeconds);
+            ctx.restore();
+        }
+
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -1350,6 +2206,10 @@
 
         function initParticles() {
             particles = [];
+            if (SEASONAL_SCENES[currentTheme]) {
+                SEASONAL_SCENES[currentTheme].resize(canvas.width, canvas.height);
+                return;
+            }
             if (currentTheme === 'biolum') {
                 const NUM_BIOLUM = 2500;
                 for (let i = 0; i < NUM_BIOLUM; i++) particles.push(new BiolumParticle());
@@ -1508,6 +2368,10 @@
 
         function drawFrame() {
             ctx.globalCompositeOperation = 'source-over';
+            if (SEASONAL_SCENES[currentTheme]) {
+                drawSeasonalScene(SEASONAL_SCENES[currentTheme]);
+                return;
+            }
             if (currentTheme === 'space') {
                 ctx.fillStyle = '#050510';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1855,7 +2719,11 @@
             else if (animationId === null) animate();
         });
 
+        // `month` (0 = January) marks a seasonal theme: it is offered only
+        // during that month and leaves the menu when the month ends.
         const THEMES = [
+            { v: 'leaves',   label: '🍁 Falling Leaves',   month: 9 },
+            { v: 'candles',  label: '🕯️ Midnight Candles', month: 9 },
             { v: 'space',    label: '🌌 Space Explorer' },
             { v: 'ocean',    label: '🌊 Deep Ocean' },
             { v: 'cyber',    label: '🟩 Cyber Matrix' },
@@ -1869,10 +2737,24 @@
             { v: 'quantum',  label: '⚛️ Quantum Realm' }
         ];
 
+        function isSeasonalTheme(value) {
+            const theme = THEMES.find(t => t.v === value);
+            return Boolean(theme) && theme.month !== undefined;
+        }
+
+        function isThemeInSeason(theme) {
+            return theme.month === undefined || theme.month === new Date().getMonth();
+        }
+
         const themeButton = document.getElementById('theme-button');
         const themeMenu = document.getElementById('theme-menu');
 
         function applyTheme(value) {
+            // Keep the last year-round pick, so there is something to go
+            // back to once a seasonal theme's month is over.
+            if (isSeasonalTheme(value) && !isSeasonalTheme(currentTheme)) {
+                savePref('classtimr-theme-standard', currentTheme);
+            }
             currentTheme = value;
             savePref('classtimr-theme', currentTheme);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1892,12 +2774,18 @@
 
         function buildThemeMenu() {
             themeMenu.innerHTML = '';
-            THEMES.forEach(t => {
+            THEMES.filter(isThemeInSeason).forEach(t => {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.setAttribute('role', 'menuitemradio');
                 item.setAttribute('aria-current', String(t.v === currentTheme));
                 item.textContent = t.label;
+                if (t.month !== undefined) {
+                    const tag = document.createElement('span');
+                    tag.className = 'theme-tag';
+                    tag.textContent = new Date(2000, t.month).toLocaleString('en', { month: 'long' });
+                    item.appendChild(tag);
+                }
                 item.addEventListener('click', () => {
                     applyTheme(t.v);
                     closeThemeMenu();
@@ -1947,14 +2835,25 @@
 
         function restorePrefs() {
             let theme;
+            let standardTheme;
             try {
                 theme = localStorage.getItem('classtimr-theme');
+                standardTheme = localStorage.getItem('classtimr-theme-standard');
             } catch (e) { return; }
 
             const match = THEMES.find(t => t.v === theme);
-            if (match) {
+            if (!match) return;
+            if (isThemeInSeason(match)) {
                 currentTheme = match.v;
+                return;
             }
+
+            // A seasonal pick whose month has ended: go back to the last
+            // year-round theme and stop remembering the seasonal one.
+            if (standardTheme && THEMES.some(t => t.v === standardTheme) && !isSeasonalTheme(standardTheme)) {
+                currentTheme = standardTheme;
+            }
+            savePref('classtimr-theme', currentTheme);
         }
 
         // Hidden tabs get their setInterval throttled to roughly once a minute,
