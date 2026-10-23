@@ -400,6 +400,102 @@
         .pop-controls { display: flex; gap: 0.5rem; }
         .pop-btn { padding: 0.25rem 0.875rem; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.15); background: #1f2937; color: #e5e7eb; font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
         .pop-btn:hover { background: #9333ea; color: #fff; }
+
+        /* Noise mode: a classroom noise meter on the same themed background.
+           Everything here is scoped to body.mode-noise or to #noise-* ids, so
+           Timer, Stopwatch and Clock render exactly as before. Red is the
+           darkest of the three zone colours so the zones also differ by
+           brightness, and the status word always carries the meaning, so
+           nobody has to tell red from green. */
+        #noise-stage, #noise-snow { display: none; }
+        body.mode-noise #noise-stage { display: flex; }
+        body.mode-noise #noise-snow { display: block; }
+        /* The island's noise group: "Voice bar" in Timer, Stopwatch and Clock;
+           Look and Use mic in Noise mode; baseline and Settings in either
+           whenever the meter is in use. */
+        #noise-controls { display: flex; }
+        #noise-controls .noise-only, #noise-controls .noise-tools { display: none; }
+        body.mode-noise #noise-controls .noise-only,
+        body.mode-noise #noise-controls .noise-tools,
+        body.noise-bar-on #noise-controls .noise-tools { display: flex; }
+        body.mode-noise #btn-noise-bar { display: none; }
+        #btn-noise-baseline:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Modes you're not in: dimmed, never disabled, full again on hover or keyboard focus. */
+        .mode-dimmed { opacity: 0.5; }
+        .mode-dimmed:hover, .mode-dimmed:focus-visible { opacity: 1; }
+        #btn-noise-bar .island-dot { display: none; }
+        #btn-noise-bar[aria-pressed="true"] { background-color: #9333ea; }
+        #btn-noise-bar[aria-pressed="true"] .island-dot { display: inline-block; background: #fff; box-shadow: 0 0 6px #fff; }
+        body.mode-noise .timer-box,
+        body.mode-noise #popped-out-note,
+        body.mode-noise #btn-pop-out { display: none !important; }
+        #noise-snow { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        #noise-stage {
+            --noise-zone: #34d399;
+            flex-direction: column; align-items: center; justify-content: center;
+            gap: clamp(0.75rem, 3vh, 2rem);
+            width: 100%; padding: 4.5rem 1rem 1.5rem;
+            max-height: 100vh;
+        }
+        #noise-stage[data-zone="yellow"], .noise-strip[data-zone="yellow"] { --noise-zone: #fbbf24; }
+        #noise-stage[data-zone="red"], .noise-strip[data-zone="red"] { --noise-zone: #ef4444; }
+        .noise-status {
+            order: 1;
+            font-weight: 600; line-height: 1; letter-spacing: -0.03em; text-align: center;
+            font-size: clamp(2.5rem, 9vw, 9rem);
+            color: var(--noise-zone);
+            text-shadow: 0 2px 24px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6);
+            transition: color 0.5s ease;
+        }
+        #noise-stage:not([data-look="bars"]) .noise-status { order: 2; font-size: clamp(2rem, 5.5vw, 5.5rem); }
+        .noise-visual { order: 1; }
+        .noise-visual[hidden], .noise-note:empty { display: none; }
+        .noise-note { order: 3; min-height: 1.5em; max-width: 60ch; text-align: center; font-size: 1rem; line-height: 1.5; color: #d1d5db; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); }
+        .noise-note.is-warning { color: #fbbf24; }
+        .noise-meter { display: flex; gap: clamp(3px, 0.6vw, 8px); width: min(1100px, 92vw); height: clamp(70px, 16vh, 160px); }
+        .noise-seg { flex: 1; border-radius: 6px; background: rgba(255, 255, 255, 0.1); transition: background 0.08s linear; }
+        .noise-seg.is-on.zone-green { background: #34d399; }
+        .noise-seg.is-on.zone-yellow { background: #fbbf24; }
+        .noise-seg.is-on.zone-red { background: #ef4444; }
+        .noise-face { width: min(50vh, 70vw, 440px); aspect-ratio: 1; }
+        .noise-tree { width: min(54vh, 86vw, 540px); aspect-ratio: 400 / 350; }
+        .noise-snowman { width: min(44vh, 62vw, 380px); aspect-ratio: 300 / 360; }
+        .noise-visual svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        #btn-noise-mic .island-dot { display: none; }
+        #btn-noise-mic.is-live .island-dot { display: inline-block; }
+        .noise-field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; font-size: 0.875rem; color: #d1d5db; }
+        .noise-field-row { display: flex; justify-content: space-between; }
+        .noise-field output { font-family: 'Share Tech Mono', monospace; color: #fff; }
+        #noise-calibrate-box { text-align: center; cursor: pointer; }
+        #noise-countdown { font-size: clamp(5rem, 14vw, 10rem); line-height: 1; }
+        /* Noise bar: a slim meter under the digits in Timer, Stopwatch and
+           Clock, which travels into the pop-out with them. */
+        .noise-strip {
+            --noise-zone: #34d399;
+            display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+            width: min(760px, 86vw); margin-top: -1rem;
+        }
+        .noise-strip[hidden], body.mode-noise .noise-strip { display: none; }
+        .noise-strip .noise-meter { width: 100%; height: clamp(22px, 5vh, 48px); }
+        .noise-strip-status {
+            font-weight: 600; line-height: 1; font-size: clamp(1.25rem, 3vw, 2.25rem);
+            color: var(--noise-zone);
+            text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6);
+            transition: color 0.5s ease;
+        }
+        .noise-strip .noise-note { font-size: 0.875rem; }
+        body.pop-out .noise-strip { width: 92vw; margin-top: 0; gap: 0.25rem; }
+        /* vw/vh here are the pop-out's own size, so the bar grows when the
+           teacher drags the window bigger. */
+        body.pop-out .noise-strip .noise-meter { height: clamp(10px, 5vh, 40px); gap: 2px; }
+        body.pop-out .noise-strip .noise-seg { border-radius: 3px; }
+        body.pop-out .noise-strip-status { font-size: clamp(0.8125rem, 4vw, 2rem); }
+        body.pop-out .noise-strip .noise-note { font-size: 0.75rem; line-height: 1.3; }
+        /* The live theme moves into the pop-out behind the digits. */
+        body.pop-out > :not(#bg-canvas) { position: relative; z-index: 1; }
+        @media (prefers-reduced-motion: reduce) {
+            .noise-status, .noise-seg, .noise-strip-status { transition: none; }
+        }
     </style>
 </head>
 <body class="text-white select-none">
@@ -407,6 +503,7 @@
     <h1 class="sr-only">Timr — free full-screen classroom timer</h1>
     <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
     <canvas id="bg-canvas" class="fixed inset-0 w-full h-full z-0" aria-hidden="true"></canvas>
+    <canvas id="noise-snow" aria-hidden="true"></canvas>
     <div id="flash-overlay" aria-hidden="true"></div>
 
     <div class="corner-buttons">
@@ -428,9 +525,71 @@
                 15:00
             </div>
         </div>
+        <div id="noise-strip" class="noise-strip" data-zone="green" hidden>
+            <div id="noise-strip-status" class="noise-strip-status"></div>
+            <div id="noise-strip-meter" class="noise-meter" aria-hidden="true"></div>
+            <p id="noise-strip-note" class="noise-note"></p>
+        </div>
         <div id="popped-out-note" class="glass-panel" style="display:none">
             <p style="margin:0">The timer is in its pop-out window.</p>
             <button type="button" onclick="togglePopOut()" class="pop-btn" style="font-size:1rem; padding:0.5rem 1.25rem">Bring it back here</button>
+        </div>
+
+        <!-- Noise mode. The SVG pictures are decoration; the status word
+             carries the meaning and is announced through #sr-status. -->
+        <div id="noise-stage" data-look="bars" data-zone="green">
+            <div id="noise-status" class="noise-status">Working voices</div>
+            <div id="noise-meter" class="noise-visual noise-meter" aria-hidden="true"></div>
+            <div id="noise-face" class="noise-visual noise-face" hidden aria-hidden="true">
+                <svg viewBox="-110 -110 220 220">
+                    <circle data-part="body" r="96" fill="#ffd84d"/>
+                    <path data-part="brow-left" d="" stroke="#1a1206" stroke-width="9" stroke-linecap="round" fill="none"/>
+                    <path data-part="brow-right" d="" stroke="#1a1206" stroke-width="9" stroke-linecap="round" fill="none"/>
+                    <ellipse data-part="eye-left" cx="-36" cy="-18" rx="11" ry="14" fill="#1a1206"/>
+                    <ellipse data-part="eye-right" cx="36" cy="-18" rx="11" ry="14" fill="#1a1206"/>
+                    <path data-part="mouth" d="" fill="none" stroke="#1a1206" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div id="noise-tree" class="noise-visual noise-tree" hidden aria-hidden="true">
+                <svg viewBox="0 0 400 350">
+                    <ellipse cx="200" cy="332" rx="180" ry="10" fill="#ffffff" opacity="0.06"/>
+                    <g data-part="sway"><g data-part="branches" stroke="#6b4426" stroke-linecap="round" fill="none"></g><g data-part="leaves"></g></g>
+                    <g data-part="fallen"></g>
+                </svg>
+            </div>
+            <div id="noise-snowman" class="noise-visual noise-snowman" hidden aria-hidden="true">
+                <svg viewBox="0 0 300 360">
+                    <defs>
+                        <radialGradient id="noise-snow-fill" cx="40%" cy="35%" r="70%">
+                            <stop offset="0" stop-color="#ffffff"/>
+                            <stop offset="1" stop-color="#cfe0f2"/>
+                        </radialGradient>
+                        <linearGradient id="noise-water-fill" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0" stop-color="#9fd3ff" stop-opacity="0.85"/>
+                            <stop offset="1" stop-color="#5aa9e6" stop-opacity="0.6"/>
+                        </linearGradient>
+                    </defs>
+                    <ellipse cx="150" cy="334" rx="140" ry="10" fill="#ffffff" opacity="0.06"/>
+                    <ellipse data-part="puddle" cx="150" cy="332" rx="30" ry="4" fill="url(#noise-water-fill)" opacity="0"/>
+                    <path data-part="arm-left" d="" stroke="#7a4b2a" stroke-width="6" stroke-linecap="round" fill="none"/>
+                    <path data-part="arm-right" d="" stroke="#7a4b2a" stroke-width="6" stroke-linecap="round" fill="none"/>
+                    <ellipse data-part="ball-bottom" cx="150" cy="260" rx="70" ry="70" fill="url(#noise-snow-fill)"/>
+                    <ellipse data-part="ball-middle" cx="150" cy="160" rx="50" ry="50" fill="url(#noise-snow-fill)"/>
+                    <g data-part="buttons" fill="#1f2937"></g>
+                    <path data-part="scarf" d="" fill="#d64545"/>
+                    <ellipse data-part="ball-top" cx="150" cy="90" rx="36" ry="36" fill="url(#noise-snow-fill)"/>
+                    <g data-part="face" fill="#1f2937"></g>
+                    <path data-part="nose" d="" fill="#f28c28"/>
+                    <g data-part="drips" fill="#9fd3ff"></g>
+                    <g data-part="hat">
+                        <rect x="-34" y="-6" width="68" height="10" rx="3" fill="#111827"/>
+                        <rect x="-23" y="-52" width="46" height="48" rx="4" fill="#111827"/>
+                        <rect x="-23" y="-16" width="46" height="8" fill="#d64545"/>
+                    </g>
+                    <g data-part="sparkles" fill="#ffffff"></g>
+                </svg>
+            </div>
+            <p id="noise-note" class="noise-note"></p>
         </div>
     </main>
 
@@ -456,8 +615,8 @@
 
             <div class="flex items-center gap-1">
                 <button id="btn-mode-timer" onclick="switchMode('timer')" aria-pressed="true" class="px-3 py-1.5 bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Timer</button>
-                <button id="btn-mode-stopwatch" onclick="switchMode('stopwatch')" aria-pressed="false" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Stopwatch</button>
-                <button id="btn-mode-clock" onclick="switchMode('clock')" aria-pressed="false" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Clock</button>
+                <button id="btn-mode-stopwatch" onclick="switchMode('stopwatch')" aria-pressed="false" class="mode-dimmed px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Stopwatch</button>
+                <button id="btn-mode-clock" onclick="switchMode('clock')" aria-pressed="false" class="mode-dimmed px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Clock</button>
                 <div class="theme-picker">
                     <button id="theme-button" type="button" onclick="toggleThemeMenu()" aria-haspopup="true" aria-expanded="false" class="flex items-center px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">
                         <span>Themes</span>
@@ -465,6 +624,8 @@
                     </button>
                     <div id="theme-menu" class="theme-menu hidden" role="menu" aria-label="Select theme"></div>
                 </div>
+                <span class="island-divider" aria-hidden="true"></span>
+                <button id="btn-mode-noise" onclick="switchMode('noise')" aria-pressed="false" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Voice level</button>
             </div>
 
             <div id="quick-start-section" class="flex items-center gap-1" role="group" aria-label="Quick start">
@@ -474,6 +635,27 @@
                 <button onclick="setPreset(10)" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">10 Min</button>
                 <button onclick="setPreset(15)" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">15 Min</button>
                 <button onclick="showCustomTimeModal()" class="px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">Custom</button>
+            </div>
+
+            <div id="noise-controls" class="flex-wrap items-center justify-center gap-1" role="group" aria-label="Voice level">
+                <button id="btn-noise-bar" type="button" aria-pressed="false" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">
+                    <span class="island-dot is-running" aria-hidden="true"></span>
+                    <span>Voice bar</span>
+                </button>
+                <div class="theme-picker noise-only">
+                    <button id="noise-look-button" type="button" aria-haspopup="true" aria-expanded="false" class="flex items-center px-3 py-1.5 bg-gray-800 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition">
+                        <span>Look</span>
+                        <svg class="theme-chevron h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div id="noise-look-menu" class="theme-menu hidden" role="menu" aria-label="Select meter look"></div>
+                </div>
+                <button id="btn-noise-mic" type="button" class="noise-only flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-sm transition">
+                    <span class="island-dot is-running" aria-hidden="true"></span>
+                    <span id="noise-mic-label">Use mic</span>
+                </button>
+                <button id="btn-noise-settings" type="button" aria-label="Voice level settings" title="Voice level settings" class="noise-tools items-center justify-center w-9 h-9 bg-gray-800 hover:bg-purple-600 text-white rounded-lg transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
             </div>
         </div>
     </div>
@@ -496,6 +678,46 @@
         </div>
     </div>
 
+    <!-- Noise settings and the quiet-baseline countdown share the custom-time
+         modal's look and keyboard behaviour. -->
+    <div id="noise-settings-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300 space-y-4" id="noise-settings-box" role="dialog" aria-modal="true" aria-labelledby="noise-settings-title" style="width: min(24rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow-y: auto">
+            <h3 id="noise-settings-title" class="text-xl text-white font-semibold mb-2 tracking-wide">Voice level settings</h3>
+            <label class="noise-field" for="noise-mic-select"><span class="noise-field-row">Microphone</span>
+                <select id="noise-mic-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500">
+                    <option value="">Computer default</option>
+                </select>
+                <span id="noise-mic-hint" class="text-sm text-gray-400"></span>
+            </label>
+            <div class="noise-field">
+                <button id="btn-noise-baseline" type="button" class="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold transition">Set quiet baseline</button>
+                <p id="noise-baseline-hint" class="text-sm text-gray-400"></p>
+            </div>
+            <label class="noise-field" for="noise-yellow-at"><span class="noise-field-row">Yellow starts at <output id="noise-yellow-at-out"></output></span>
+                <input type="range" id="noise-yellow-at" min="10" max="80" step="1"></label>
+            <label class="noise-field" for="noise-red-at"><span class="noise-field-row">Red starts at <output id="noise-red-at-out"></output></span>
+                <input type="range" id="noise-red-at" min="20" max="95" step="1"></label>
+            <label class="noise-field" for="noise-hold"><span class="noise-field-row">Must stay loud for <output id="noise-hold-out"></output></span>
+                <input type="range" id="noise-hold" min="0" max="5" step="0.5"></label>
+            <label class="noise-field" for="noise-range"><span class="noise-field-row">Sensitivity <output id="noise-range-out"></output></span>
+                <input type="range" id="noise-range" min="25" max="60" step="1"></label>
+            <label class="noise-field" for="noise-change-time"><span class="noise-field-row">Tree and snowman change over <output id="noise-change-time-out"></output></span>
+                <input type="range" id="noise-change-time" min="5" max="60" step="5"></label>
+            <p class="text-sm text-gray-400">Hold time stops one dropped textbook or one laugh from setting it off.</p>
+            <div class="flex w-full mt-1">
+                <button id="noise-settings-done" type="button" class="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] transition">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="noise-calibrate-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300" id="noise-calibrate-box" role="dialog" aria-modal="true" aria-labelledby="noise-calibrate-title" tabindex="-1">
+            <h3 id="noise-calibrate-title" class="text-xl text-white font-semibold mb-2 tracking-wide">Stay quiet</h3>
+            <div id="noise-countdown" class="font-digital text-white" aria-hidden="true">3</div>
+            <p class="text-sm text-gray-400 mt-1">Click or press Esc to cancel</p>
+        </div>
+    </div>
+
     <script>
         // --- 1. TIMER LOGIC ---
         // remainingMs / elapsedMs are the source of truth; timeRemaining and
@@ -510,6 +732,7 @@
         let isRunning = false;
         let isStopwatchMode = false;
         let isClockMode = false;
+        let isNoiseMode = false;
         let clockInterval = null;
         let elapsedTime = 0;
         let timerStartedAt = null;  // Date.now() when timer was started
@@ -555,7 +778,9 @@
             const dot = document.getElementById('island-dot');
             if (!label) return;
             let text;
-            if (isClockMode) {
+            if (isNoiseMode) {
+                text = noiseIslandLabel();
+            } else if (isClockMode) {
                 text = 'Clock';
             } else if (isStopwatchMode) {
                 const state = isRunning ? 'Running' : elapsedMs === 0 ? 'Ready' : 'Paused';
@@ -738,31 +963,45 @@
             clearInterval(clockInterval);
             clockInterval = null;
 
+            // Noise has no digits to float, so the pop-out closes first.
+            if (mode === 'noise' && pipWindow) pipWindow.close();
+
             isStopwatchMode = (mode === 'stopwatch');
             isClockMode = (mode === 'clock');
+            isNoiseMode = (mode === 'noise');
             resetTimer();
+            setNoiseActive(isNoiseMode);
 
             const btnTimer = document.getElementById('btn-mode-timer');
             const btnStopwatch = document.getElementById('btn-mode-stopwatch');
             const btnClock = document.getElementById('btn-mode-clock');
+            const btnNoise = document.getElementById('btn-mode-noise');
             const quickStart = document.getElementById('quick-start-section');
             const playControls = document.getElementById('play-controls') || btnPlay.parentElement;
 
             // Reset all mode buttons
-            [btnTimer, btnStopwatch, btnClock].forEach(btn => {
+            [btnTimer, btnStopwatch, btnClock, btnNoise].forEach(btn => {
                 btn.classList.remove('bg-purple-600');
                 btn.classList.add('bg-gray-800', 'hover:bg-purple-600');
                 btn.setAttribute('aria-pressed', 'false');
             });
 
             // Highlight active mode
-            const activeBtn = mode === 'timer' ? btnTimer : mode === 'stopwatch' ? btnStopwatch : btnClock;
+            const modeButtons = { timer: btnTimer, stopwatch: btnStopwatch, clock: btnClock, noise: btnNoise };
+            const activeBtn = modeButtons[mode] || btnTimer;
             activeBtn.classList.add('bg-purple-600');
             activeBtn.classList.remove('bg-gray-800', 'hover:bg-purple-600');
             activeBtn.setAttribute('aria-pressed', 'true');
+            // The modes you're not in dim (still clickable); Noise never dims,
+            // because it can sit alongside any of them.
+            [btnTimer, btnStopwatch, btnClock].forEach(btn => btn.classList.toggle('mode-dimmed', btn !== activeBtn));
 
             // Show/hide quick start and play controls
-            if (isClockMode) {
+            if (isNoiseMode) {
+                quickStart.classList.add('hidden');
+                playControls.style.display = 'none';
+                document.title = 'Voice level - Timr';
+            } else if (isClockMode) {
                 quickStart.classList.add('hidden');
                 playControls.style.display = 'none';
                 clockInterval = setInterval(updateClockDisplay, 1000);
@@ -925,6 +1164,7 @@
             if (island.matches(':hover') || island.querySelector(':focus-visible')) return;
             if (!themeMenu.classList.contains('hidden')) return;
             if (!customModal.classList.contains('hidden')) return;
+            if (noiseHoldsIsland()) return;
             morphIsland(() => island.classList.remove('is-expanded'));
             controlBar.inert = true;
             islandPill.setAttribute('aria-expanded', 'false');
@@ -1024,7 +1264,8 @@
                 return;
             }
             try {
-                pipWindow = await documentPictureInPicture.requestWindow({ width: 340, height: 200 });
+                // Taller when the noise bar comes along, so the digits keep their size.
+                pipWindow = await documentPictureInPicture.requestWindow({ width: 340, height: noiseBarOn ? 260 : 200 });
             } catch (err) {
                 console.log(`Error opening the pop-out: ${err.message}`);
                 return;
@@ -1060,7 +1301,9 @@
             controls.append(playButton, resetButton);
 
             timeDisplay.addEventListener('click', togglePlayPause);
-            pipDoc.body.append(timeDisplay, controls);
+            // The live theme and the noise bar travel with the digits (Tom
+            // 2026-10-23). Moving the real nodes keeps one copy of each.
+            pipDoc.body.append(canvas, timeDisplay, noiseStrip, controls);
             timerBox.style.display = 'none';
             poppedOutNote.style.display = 'flex';
             popOutLabel.textContent = 'Close pop-out';
@@ -1081,9 +1324,19 @@
             // pop-out is visible, so its own interval keeps the digits live.
             // The ticks read Date.now(), so running twice is harmless.
             pipWindow.setInterval(refreshPopOut, 250);
-            pipWindow.addEventListener('resize', fitPopOutText);
+            pipWindow.addEventListener('resize', () => {
+                fitPopOutText();
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(resizeCanvas, 150);
+            });
             pipWindow.addEventListener('pagehide', closePopOut);
 
+            // Same reason as the interval above: the hidden main tab stops
+            // its animation frames, so the theme and meter run on the
+            // pop-out's clock while it is open.
+            resizeCanvas();
+            restartAnimation();
+            restartNoiseLoop();
             updatePopOutControls();
             fitPopOutText();
         }
@@ -1105,7 +1358,8 @@
             const chars = timeDisplay.textContent.trim().length || 5;
             const byWidth = (pipWindow.innerWidth * 0.92) / (chars * 0.56);
             const showsControls = !isClockMode;
-            const byHeight = (pipWindow.innerHeight - (showsControls ? 48 : 12)) * 0.9;
+            const stripHeight = noiseStrip.hidden ? 0 : noiseStrip.offsetHeight + 6;
+            const byHeight = (pipWindow.innerHeight - (showsControls ? 48 : 12) - stripHeight) * 0.9;
             const size = Math.floor(Math.min(byWidth, byHeight)) + 'px';
             if (timeDisplay.style.fontSize !== size) timeDisplay.style.fontSize = size;
         }
@@ -1127,10 +1381,15 @@
             timeDisplay.removeEventListener('click', togglePlayPause);
             timeDisplay.style.fontSize = '';
             timerBox.append(timeDisplay);
+            timerBox.after(noiseStrip);
+            noiseSnowCanvas.before(canvas);
             timerBox.style.display = '';
             poppedOutNote.style.display = 'none';
             popOutLabel.textContent = 'Pop out';
             pipWindow = null;
+            resizeCanvas();
+            restartAnimation();
+            restartNoiseLoop();
         }
 
         // --- 3.5 KEYBOARD SHORTCUTS ---
@@ -1145,6 +1404,9 @@
             if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
             if (e.target.closest('[role="button"]')) return;
             if (!themeMenu.classList.contains('hidden')) return;
+            // Noise mode has no timer on screen, so Space and R must not
+            // start or reset one out of sight. F still toggles fullscreen.
+            if (isNoiseMode && e.code !== 'KeyF') return;
             if (e.code === 'Space') {
                 e.preventDefault();
                 togglePlayPause();
@@ -2193,8 +2455,10 @@
         }
 
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            // The canvas lives in the pop-out while it is open.
+            const host = pipWindow || window;
+            canvas.width = host.innerWidth;
+            canvas.height = host.innerHeight;
             initParticles();
             if (reduceMotion.matches) paintStaticFrame();
         }
@@ -2699,9 +2963,26 @@
         // pass.
         const WARMUP_FRAMES = 30;
 
-        function paintStaticFrame() {
-            cancelAnimationFrame(animationId);
+        // The window whose animation clock drives the canvas: the pop-out
+        // while it is open, so the theme keeps moving when the main tab is
+        // hidden behind slides.
+        let animationHost = window;
+
+        function stopAnimation() {
+            // The host may be a pop-out that is already closing.
+            try {
+                if (animationId) animationHost.cancelAnimationFrame(animationId);
+            } catch (e) { /* its frames died with it */ }
             animationId = null;
+        }
+
+        function restartAnimation() {
+            stopAnimation();
+            animate();
+        }
+
+        function paintStaticFrame() {
+            stopAnimation();
             for (let i = 0; i < WARMUP_FRAMES; i++) drawFrame();
         }
 
@@ -2711,7 +2992,8 @@
                 return;
             }
             drawFrame();
-            animationId = requestAnimationFrame(animate);
+            animationHost = pipWindow || window;
+            animationId = animationHost.requestAnimationFrame(animate);
         }
 
         reduceMotion.addEventListener('change', () => {
@@ -2862,8 +3144,8 @@
         // again, and drop the canvas loop while nobody can see it.
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
+                // A popped-out theme is still on screen, in its own window.
+                if (!pipWindow) stopAnimation();
                 return;
             }
 
@@ -2885,6 +3167,1197 @@
         restorePrefs();
         resizeCanvas();
         animate();
+    </script>
+    <script>
+        // --- 6. NOISE MODE ---
+        // A classroom noise meter (Tom 2026-10-23). It asks for the microphone
+        // only when the teacher presses "Use mic", analyses the signal in
+        // memory, and never records, stores or sends audio. The scale is
+        // relative to the room's own quiet baseline, not calibrated decibels.
+        // This block runs after the main script, so it shares its globals
+        // (announce, savePref, controlBar, mainEl, reduceMotion, isNoiseMode).
+
+        // Pure helpers, kept free of the DOM so e2e tests can check the maths
+        // without a microphone (window.TimrNoise).
+        const TimrNoise = (() => {
+            // month, 0 = January. Adding a seasonal look is one line here.
+            const SEASONAL_LOOKS = { tree: 10, snowman: 11 };
+            const LOOKS = ['bars', 'face', 'tree', 'snowman'];
+            const ZONE_RANK = { green: 0, yellow: 1, red: 2 };
+            const ZONE_WORDS = { green: 'Working voices', yellow: 'Getting loud', red: 'Too loud' };
+
+            function clamp(value, low, high) {
+                return Math.max(low, Math.min(high, value));
+            }
+
+            // dBFS to a 0-100 scale that starts just under the quiet baseline.
+            // `range` is the sensitivity: fewer dB from silent to full scale.
+            function levelFromDb(db, baseline, range) {
+                return clamp(((db - (baseline - 4)) / range) * 100, 0, 100);
+            }
+
+            // Fast attack, slow release, so a burst shows at once and fades gently.
+            function smoothLevel(previous, level) {
+                const rate = level > previous ? 0.45 : 0.1;
+                return previous + (level - previous) * rate;
+            }
+
+            function zoneFor(level, yellowAt, redAt) {
+                if (level >= redAt) return 'red';
+                if (level >= yellowAt) return 'yellow';
+                return 'green';
+            }
+
+            // A louder zone must last `holdSeconds` before the screen shows it,
+            // and a quieter one must last a second, so one dropped textbook or
+            // one laugh doesn't flip the display.
+            function createZoneHold() {
+                let shown = 'green';
+                let candidate = 'green';
+                let candidateSince = 0;
+                return {
+                    update(zone, nowMs, holdSeconds) {
+                        if (zone !== candidate) {
+                            candidate = zone;
+                            candidateSince = nowMs;
+                        }
+                        const isLouder = ZONE_RANK[candidate] > ZONE_RANK[shown];
+                        const neededMs = isLouder ? holdSeconds * 1000 : 1000;
+                        if (candidate !== shown && nowMs - candidateSince >= neededMs) {
+                            shown = candidate;
+                        }
+                        return shown;
+                    }
+                };
+            }
+
+            // Wear (0-1) drives the tree and snowman. Only red does damage;
+            // yellow holds it where it is (Tom 2026-10-23), and green recovers,
+            // slower than red wears, so the class has to earn it back.
+            function stepWear(wear, zone, deltaSeconds, changeTime) {
+                let next = wear;
+                if (zone === 'red') next += deltaSeconds / changeTime;
+                else if (zone === 'green') next -= deltaSeconds / (changeTime * 1.5);
+                return clamp(next, 0, 1);
+            }
+
+            // Median, not mean: one cough during calibration can't skew it.
+            function medianOf(samples) {
+                if (!samples.length) return null;
+                const sorted = [...samples].sort((a, b) => a - b);
+                const middle = Math.floor(sorted.length / 2);
+                if (sorted.length % 2) return sorted[middle];
+                return (sorted[middle - 1] + sorted[middle]) / 2;
+            }
+
+            function lookAvailable(look, date, preview) {
+                if (!Object.prototype.hasOwnProperty.call(SEASONAL_LOOKS, look)) return LOOKS.includes(look);
+                return preview || date.getMonth() === SEASONAL_LOOKS[look];
+            }
+
+            // A saved look that is unknown or out of season falls back to Bars.
+            function resolveLook(saved, date, preview) {
+                return lookAvailable(saved, date, preview) ? saved : 'bars';
+            }
+
+            function statusWord(look, zone, wear) {
+                const recovering = wear > 0.02;
+                if (look === 'tree') {
+                    if (zone === 'red') return 'Leaves falling!';
+                    if (zone === 'yellow') return 'Getting breezy';
+                    return recovering ? 'Growing back' : 'Full and green';
+                }
+                if (look === 'snowman') {
+                    if (zone === 'red') return 'Melting!';
+                    if (zone === 'yellow') return 'Getting warm';
+                    return recovering ? 'Refreezing' : 'Frozen solid';
+                }
+                return ZONE_WORDS[zone];
+            }
+
+            return {
+                SEASONAL_LOOKS, LOOKS, levelFromDb, smoothLevel, zoneFor, createZoneHold,
+                stepWear, medianOf, lookAvailable, resolveLook, statusWord
+            };
+        })();
+
+        // --- 6.1 Settings (this browser only) ---
+        // micId '' means "whatever the computer's default input is".
+        const NOISE_DEFAULTS = { yellowAt: 45, redAt: 70, hold: 1.5, range: 42, baseline: -55, changeTime: 15, look: 'bars', micId: '' };
+        const NOISE_LIMITS = { yellowAt: [10, 80], redAt: [20, 95], hold: [0, 5], range: [25, 60], changeTime: [5, 60], baseline: [-120, 0] };
+        const NOISE_MIN_GAP = 5;
+
+        function loadNoiseSettings() {
+            const settings = { ...NOISE_DEFAULTS };
+            let saved = {};
+            try {
+                saved = JSON.parse(localStorage.getItem('classtimr-noise') || '{}') || {};
+            } catch (e) { saved = {}; }
+            Object.keys(NOISE_LIMITS).forEach(key => {
+                if (typeof saved[key] !== 'number' || !Number.isFinite(saved[key])) return;
+                const [low, high] = NOISE_LIMITS[key];
+                settings[key] = Math.max(low, Math.min(high, saved[key]));
+            });
+            if (typeof saved.look === 'string') settings.look = saved.look;
+            if (typeof saved.micId === 'string') settings.micId = saved.micId;
+            if (settings.redAt < settings.yellowAt + NOISE_MIN_GAP) {
+                settings.yellowAt = NOISE_DEFAULTS.yellowAt;
+                settings.redAt = NOISE_DEFAULTS.redAt;
+            }
+            return settings;
+        }
+
+        const noiseSettings = loadNoiseSettings();
+
+        function saveNoiseSettings() {
+            savePref('classtimr-noise', JSON.stringify(noiseSettings));
+        }
+
+        // --- 6.2 Elements ---
+        const noiseStage = document.getElementById('noise-stage');
+        const noiseStatus = document.getElementById('noise-status');
+        const noiseNote = document.getElementById('noise-note');
+        const noiseMeter = document.getElementById('noise-meter');
+        const noiseFace = document.getElementById('noise-face');
+        const noiseTree = document.getElementById('noise-tree');
+        const noiseSnowman = document.getElementById('noise-snowman');
+        const noiseMicButton = document.getElementById('btn-noise-mic');
+        const noiseMicLabel = document.getElementById('noise-mic-label');
+        const noiseBaselineButton = document.getElementById('btn-noise-baseline');
+        const noiseSettingsButton = document.getElementById('btn-noise-settings');
+        const noiseLookButton = document.getElementById('noise-look-button');
+        const noiseLookMenu = document.getElementById('noise-look-menu');
+        const noiseSettingsModal = document.getElementById('noise-settings-modal');
+        const noiseSettingsBox = document.getElementById('noise-settings-box');
+        const noiseCalibrateModal = document.getElementById('noise-calibrate-modal');
+        const noiseCalibrateBox = document.getElementById('noise-calibrate-box');
+        const noiseCountdown = document.getElementById('noise-countdown');
+        const noiseStrip = document.getElementById('noise-strip');
+        const noiseStripStatus = document.getElementById('noise-strip-status');
+        const noiseStripMeter = document.getElementById('noise-strip-meter');
+        const noiseStripNote = document.getElementById('noise-strip-note');
+        const noiseBarButton = document.getElementById('btn-noise-bar');
+        const noiseSnowCanvas = document.getElementById('noise-snow');
+        const noiseSnowContext = noiseSnowCanvas.getContext('2d');
+        const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+        const DEMO_NOTE = 'Demo classroom. Press "Use mic" to measure your room.';
+
+        function part(container, name) {
+            return container.querySelector(`[data-part="${name}"]`);
+        }
+
+        function lerp(from, to, amount) {
+            return from + (to - from) * amount;
+        }
+
+        function clampNumber(value, low, high) {
+            return Math.max(low, Math.min(high, value));
+        }
+
+        // The noise bar under the timer has room for warnings only; the
+        // Noise screen shows every note.
+        function setNoiseNote(text, isWarning) {
+            noiseNote.textContent = text;
+            noiseNote.classList.toggle('is-warning', Boolean(isWarning));
+            noiseStripNote.textContent = isWarning ? text : '';
+            noiseStripNote.classList.toggle('is-warning', Boolean(isWarning));
+        }
+
+        // --- 6.3 Bars: the Noise screen's meter and the noise bar's ---
+        const NOISE_SEGMENTS = 24;
+        const noiseSegments = [];
+        [noiseMeter, noiseStripMeter].forEach(meter => {
+            for (let index = 0; index < NOISE_SEGMENTS; index++) {
+                const segment = document.createElement('div');
+                segment.className = 'noise-seg';
+                segment.dataset.index = index;
+                meter.appendChild(segment);
+                noiseSegments.push(segment);
+            }
+        });
+
+        function paintNoiseZones() {
+            noiseSegments.forEach(segment => {
+                const segmentLevel = ((Number(segment.dataset.index) + 0.5) / NOISE_SEGMENTS) * 100;
+                const zone = TimrNoise.zoneFor(segmentLevel, noiseSettings.yellowAt, noiseSettings.redAt);
+                segment.classList.remove('zone-green', 'zone-yellow', 'zone-red');
+                segment.classList.add('zone-' + zone);
+            });
+        }
+
+        function drawNoiseBars(level) {
+            const litCount = Math.round((level / 100) * NOISE_SEGMENTS);
+            noiseSegments.forEach(segment => segment.classList.toggle('is-on', Number(segment.dataset.index) < litCount));
+        }
+
+        // --- 6.4 Face: drawn, not emoji, so it looks the same on every OS ---
+        const faceParts = {
+            body: part(noiseFace, 'body'),
+            browLeft: part(noiseFace, 'brow-left'),
+            browRight: part(noiseFace, 'brow-right'),
+            eyeLeft: part(noiseFace, 'eye-left'),
+            eyeRight: part(noiseFace, 'eye-right'),
+            mouth: part(noiseFace, 'mouth')
+        };
+
+        function mixHex(fromHex, toHex, amount) {
+            const channels = hex => [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16));
+            const from = channels(fromHex);
+            const to = channels(toHex);
+            return '#' + from.map((value, index) => Math.round(lerp(value, to[index], amount)).toString(16).padStart(2, '0')).join('');
+        }
+
+        // amount: 0 = happy, 1 = upset.
+        function drawNoiseFace(amount) {
+            const colour = amount < 0.5
+                ? mixHex('#ffd84d', '#ffb020', amount / 0.5)
+                : mixHex('#ffb020', '#ff6b5b', (amount - 0.5) / 0.5);
+            faceParts.body.setAttribute('fill', colour);
+
+            const curve = lerp(34, -30, amount);
+            const halfWidth = lerp(46, 34, amount);
+            const mouthY = lerp(26, 40, amount);
+            const openness = Math.max(0, (amount - 0.65) / 0.35);
+            if (openness > 0.02) {
+                const depth = 10 + openness * 22;
+                faceParts.mouth.setAttribute('d', `M${-halfWidth},${mouthY} Q0,${mouthY + curve} ${halfWidth},${mouthY} Q0,${mouthY + curve + depth * 1.6} ${-halfWidth},${mouthY} Z`);
+                faceParts.mouth.setAttribute('fill', '#1a1206');
+            } else {
+                faceParts.mouth.setAttribute('d', `M${-halfWidth},${mouthY} Q0,${mouthY + curve} ${halfWidth},${mouthY}`);
+                faceParts.mouth.setAttribute('fill', 'none');
+            }
+
+            const eyeHeight = lerp(13, 18, amount);
+            const eyeWidth = lerp(10, 13, amount);
+            [faceParts.eyeLeft, faceParts.eyeRight].forEach(eye => {
+                eye.setAttribute('ry', eyeHeight);
+                eye.setAttribute('rx', eyeWidth);
+            });
+
+            const browAmount = Math.max(0, (amount - 0.35) / 0.65);
+            faceParts.browLeft.setAttribute('d', `M-54,${-50 - 6 * (1 - browAmount)} L-20,${-50 + 14 * browAmount}`);
+            faceParts.browRight.setAttribute('d', `M20,${-50 + 14 * browAmount} L54,${-50 - 6 * (1 - browAmount)}`);
+            const browOpacity = String(Math.min(1, browAmount * 2));
+            faceParts.browLeft.style.opacity = browOpacity;
+            faceParts.browRight.style.opacity = browOpacity;
+        }
+
+        // --- 6.5 Snowman: melt 0 = frozen solid, 1 = a puddle ---
+        const snowmanParts = {
+            ballBottom: part(noiseSnowman, 'ball-bottom'),
+            ballMiddle: part(noiseSnowman, 'ball-middle'),
+            ballTop: part(noiseSnowman, 'ball-top'),
+            puddle: part(noiseSnowman, 'puddle'),
+            face: part(noiseSnowman, 'face'),
+            nose: part(noiseSnowman, 'nose'),
+            buttons: part(noiseSnowman, 'buttons'),
+            scarf: part(noiseSnowman, 'scarf'),
+            armLeft: part(noiseSnowman, 'arm-left'),
+            armRight: part(noiseSnowman, 'arm-right'),
+            hat: part(noiseSnowman, 'hat'),
+            drips: part(noiseSnowman, 'drips'),
+            sparkles: part(noiseSnowman, 'sparkles')
+        };
+
+        // Each point is [x, y, radius?, opacity?]; spare circles shrink to 0.
+        function setDots(group, points, radius) {
+            while (group.childNodes.length < points.length) group.appendChild(document.createElementNS(SVG_NAMESPACE, 'circle'));
+            [...group.childNodes].forEach((circle, index) => {
+                if (index >= points.length) {
+                    circle.setAttribute('r', 0);
+                    return;
+                }
+                const [x, y, pointRadius, opacity] = points[index];
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', pointRadius ?? radius);
+                if (opacity !== undefined) circle.setAttribute('opacity', opacity);
+            });
+        }
+
+        function drawNoiseSnowman(melt, nowMs, isMelting) {
+            const ground = 330;
+            const centreX = 150;
+
+            // The bottom ball slumps wide and flat; the upper balls shrink and sink into it.
+            const bottom = { rx: 70 * (1 + 0.45 * melt), ry: Math.max(6, 70 * (1 - 0.82 * melt)) };
+            bottom.cy = ground - bottom.ry;
+            const middleRadius = 50 * (1 - 0.6 * melt);
+            const middle = { rx: middleRadius * (1 + 0.25 * melt), ry: Math.max(3, middleRadius * (1 - 0.3 * melt)) };
+            middle.cy = bottom.cy - bottom.ry - middle.ry + 10 + 14 * melt;
+            const topRadius = 36 * (1 - 0.55 * melt);
+            const top = { rx: topRadius * (1 + 0.15 * melt), ry: Math.max(3, topRadius * (1 - 0.2 * melt)) };
+            top.cy = middle.cy - middle.ry - top.ry + 8 + 10 * melt;
+            [[snowmanParts.ballBottom, bottom], [snowmanParts.ballMiddle, middle], [snowmanParts.ballTop, top]].forEach(([ball, shape]) => {
+                ball.setAttribute('cx', centreX);
+                ball.setAttribute('cy', shape.cy);
+                ball.setAttribute('rx', shape.rx);
+                ball.setAttribute('ry', shape.ry);
+            });
+
+            snowmanParts.puddle.setAttribute('rx', 30 + 160 * melt);
+            snowmanParts.puddle.setAttribute('ry', 4 + 14 * melt);
+            snowmanParts.puddle.setAttribute('opacity', clampNumber(melt * 3, 0, 1));
+
+            // Coal eyes and smile slide down the face.
+            const eyeY = top.cy - top.ry * 0.25 + top.ry * 0.3 * melt;
+            const eyeOffset = top.rx * 0.36;
+            const eyeRadius = 4.5 * (1 - 0.3 * melt);
+            const smile = lerp(7, -5, melt);
+            const mouthPoints = [-2, -1, 0, 1, 2].map(step => {
+                const x = centreX + step * top.rx * 0.17;
+                const y = top.cy + top.ry * 0.42 + (1 - (step * step) / 4) * smile + top.ry * 0.2 * melt;
+                return [x, y, 2.6 * (1 - 0.3 * melt)];
+            });
+            setDots(snowmanParts.face, [[centreX - eyeOffset, eyeY, eyeRadius], [centreX + eyeOffset, eyeY, eyeRadius], ...mouthPoints]);
+
+            // The carrot droops.
+            const noseY = top.cy + top.ry * 0.12;
+            const noseLength = 30 * (1 - 0.35 * melt);
+            const noseAngle = (melt * 70 * Math.PI) / 180;
+            const noseTipX = centreX + Math.cos(noseAngle) * noseLength;
+            const noseTipY = noseY + Math.sin(noseAngle) * noseLength;
+            snowmanParts.nose.setAttribute('d', `M${centreX},${noseY - 4} L${noseTipX},${noseTipY} L${centreX},${noseY + 4} Z`);
+
+            setDots(snowmanParts.buttons, [-0.45, 0, 0.45].map(step => [centreX, middle.cy + step * middle.ry, 4.5 * (1 - 0.4 * melt)]));
+
+            const scarfY = middle.cy - middle.ry + 4;
+            const scarfHalf = top.rx * 1.25;
+            snowmanParts.scarf.setAttribute('d',
+                `M${centreX - scarfHalf},${scarfY - 6} Q${centreX},${scarfY + 4} ${centreX + scarfHalf},${scarfY - 6} L${centreX + scarfHalf},${scarfY + 5} Q${centreX},${scarfY + 15} ${centreX - scarfHalf},${scarfY + 5} Z ` +
+                `M${centreX + scarfHalf * 0.4},${scarfY + 6} l${8 + 6 * melt},${26 * (1 - 0.4 * melt) + 14 * melt} l10,-3 l${-6},${-24 * (1 - 0.4 * melt) - 10 * melt} Z`);
+
+            // Stick arms sag from up-and-out to hanging, never below the ground line.
+            const armY = middle.cy - middle.ry * 0.15;
+            const armReach = 64 * (1 - 0.25 * melt);
+            const armDrop = lerp(-0.6, 0.9, melt);
+            const leftShoulder = centreX - middle.rx * 0.85;
+            const rightShoulder = centreX + middle.rx * 0.85;
+            const handY = Math.min(ground - 3, armY + Math.sin(armDrop) * armReach);
+            const leftHandX = leftShoulder - Math.cos(armDrop) * armReach;
+            const rightHandX = rightShoulder + Math.cos(armDrop) * armReach;
+            snowmanParts.armLeft.setAttribute('d', `M${leftShoulder},${armY} L${leftHandX},${handY} M${lerp(leftShoulder, leftHandX, 0.7)},${lerp(armY, handY, 0.7)} l-10,-12`);
+            snowmanParts.armRight.setAttribute('d', `M${rightShoulder},${armY} L${rightHandX},${handY} M${lerp(rightShoulder, rightHandX, 0.7)},${lerp(armY, handY, 0.7)} l10,-12`);
+
+            // The hat tilts, then slides off into the puddle.
+            const hatScale = Math.max(0.55, top.rx / 36);
+            const hatTopX = centreX + 4 * melt;
+            const hatTopY = top.cy - top.ry + 4;
+            const hatFall = clampNumber((melt - 0.7) / 0.3, 0, 1);
+            const hatX = lerp(hatTopX, centreX + 120, hatFall);
+            const hatY = lerp(hatTopY, ground - 4, hatFall);
+            const hatTilt = lerp(melt * 18, 95, hatFall);
+            snowmanParts.hat.setAttribute('transform', `translate(${hatX},${hatY}) rotate(${hatTilt}) scale(${hatScale})`);
+
+            const dripPoints = [];
+            if (isMelting && melt > 0.03) {
+                const balls = [top, top, middle, middle, bottom, bottom];
+                for (let index = 0; index < 6; index++) {
+                    const progress = ((nowMs / 900) + index / 6) % 1;
+                    const side = index % 2 ? 1 : -1;
+                    const ball = balls[index];
+                    const x = centreX + side * ball.rx * (0.55 + 0.1 * (index % 3));
+                    const startY = ball.cy + ball.ry * 0.3;
+                    dripPoints.push([x, lerp(startY, ground, progress), 3.2, (1 - progress) * 0.9]);
+                }
+            }
+            setDots(snowmanParts.drips, dripPoints);
+
+            // Frost sparkles once he is fully frozen again.
+            const sparklePoints = [];
+            if (melt < 0.02) {
+                for (let index = 0; index < 5; index++) {
+                    const progress = ((nowMs / 1400) + index / 5) % 1;
+                    const angle = index * 1.3;
+                    const twinkle = Math.sin(progress * Math.PI);
+                    sparklePoints.push([centreX + Math.cos(angle) * (60 + index * 8), 120 + Math.sin(angle * 2) * 90, 2.4 * twinkle, twinkle]);
+                }
+            }
+            setDots(snowmanParts.sparkles, sparklePoints);
+        }
+
+        // --- 6.6 Tree: bareness 0 = full and green, 1 = bare branches ---
+        const treeSway = part(noiseTree, 'sway');
+        const treeBranches = part(noiseTree, 'branches');
+        const treeLeafLayer = part(noiseTree, 'leaves');
+        const treeFallenLayer = part(noiseTree, 'fallen');
+        // Seeded, so the tree has the same shape on every visit.
+        let treeSeed = 11;
+        function treeRandom() {
+            treeSeed = (treeSeed * 16807) % 2147483647;
+            return treeSeed / 2147483647;
+        }
+        const treeTips = [];
+        (function growBranch(x, y, angle, length, width, depth) {
+            const endX = x + Math.cos(angle) * length;
+            const endY = y + Math.sin(angle) * length;
+            const branch = document.createElementNS(SVG_NAMESPACE, 'path');
+            const bend = (treeRandom() - 0.5) * length * 0.18;
+            branch.setAttribute('d', `M${x},${y} Q${(x + endX) / 2 + bend},${(y + endY) / 2} ${endX},${endY}`);
+            branch.setAttribute('stroke-width', width.toFixed(1));
+            treeBranches.appendChild(branch);
+            if (depth >= 3) treeTips.push([endX, endY]);
+            if (depth >= 5) return;
+            const childCount = depth === 0 ? 3 : 2;
+            for (let index = 0; index < childCount; index++) {
+                const spread = depth === 0 ? [-0.6, 0.05, 0.62][index] : (index ? 1 : -1) * (0.32 + treeRandom() * 0.3);
+                growBranch(endX, endY, angle + spread + (treeRandom() - 0.5) * 0.2, length * (0.7 + treeRandom() * 0.1), width * 0.64, depth + 1);
+            }
+        })(200, 332, -Math.PI / 2, 92, 24, 0);
+
+        const LEAF_PATH = 'M0,-8 C6,-5 6,4 0,9 C-6,4 -6,-5 0,-8Z';
+        const LEAF_COLOURS = [[76, 175, 80], [163, 196, 58], [242, 194, 48], [232, 134, 42], [192, 57, 43]];
+        function leafColour(progress) {
+            const position = clampNumber(progress, 0, 1) * (LEAF_COLOURS.length - 1);
+            const index = Math.min(LEAF_COLOURS.length - 2, Math.floor(position));
+            const amount = position - index;
+            return 'rgb(' + LEAF_COLOURS[index].map((value, channel) => Math.round(lerp(value, LEAF_COLOURS[index + 1][channel], amount))).join(',') + ')';
+        }
+
+        function placeLeafOnBranch(leaf) {
+            leaf.element.setAttribute('transform', `translate(${leaf.x.toFixed(1)},${leaf.y.toFixed(1)}) rotate(${leaf.homeRotation.toFixed(0)}) scale(${leaf.scale.toFixed(2)})`);
+        }
+
+        const treeLeaves = [];
+        treeTips.forEach(([tipX, tipY]) => {
+            for (let count = 0; count < 3; count++) {
+                const angle = treeRandom() * Math.PI * 2;
+                const distance = 4 + treeRandom() * 16;
+                const element = document.createElementNS(SVG_NAMESPACE, 'path');
+                element.setAttribute('d', LEAF_PATH);
+                treeLeafLayer.appendChild(element);
+                const homeRotation = treeRandom() * 360;
+                const leaf = {
+                    element, homeRotation, state: 'on', colour: '',
+                    x: tipX + Math.cos(angle) * distance, y: tipY + Math.sin(angle) * distance,
+                    scale: 1.1 + treeRandom() * 0.5,
+                    // Each leaf has its own point on the wear scale where it drops.
+                    dropAt: 0.05 + treeRandom() * 0.9,
+                    flutter: treeRandom() * Math.PI * 2,
+                    fallX: 0, fallY: 0, fallSpeed: 0, rotation: homeRotation,
+                    pileX: 0, pileY: 0, riseProgress: 0, riseFromX: 0, riseFromY: 0, riseFromRotation: 0
+                };
+                placeLeafOnBranch(leaf);
+                treeLeaves.push(leaf);
+            }
+        });
+
+        function setLeafColour(leaf, colour) {
+            if (colour === leaf.colour) return;
+            leaf.colour = colour;
+            leaf.element.setAttribute('fill', colour);
+        }
+
+        function drawNoiseTree(bareness, nowMs, level) {
+            const swayStrength = (0.4 + (level / 100) * 2.2) * (reduceMotion.matches ? 0.25 : 1);
+            treeSway.setAttribute('transform', `rotate(${(Math.sin(nowMs / 1100) * swayStrength).toFixed(2)} 200 332)`);
+            for (const leaf of treeLeaves) {
+                if (leaf.state === 'on') {
+                    if (bareness < leaf.dropAt) {
+                        // Green, then yellow, orange and red as it nears its drop point.
+                        setLeafColour(leaf, leafColour(Math.pow(bareness / leaf.dropAt, 1.4)));
+                        continue;
+                    }
+                    leaf.state = 'falling';
+                    leaf.fallX = leaf.x;
+                    leaf.fallY = leaf.y;
+                    leaf.fallSpeed = 0;
+                    leaf.rotation = leaf.homeRotation;
+                    leaf.pileX = clampNumber(leaf.x + (treeRandom() - 0.5) * 120, 30, 370);
+                    leaf.pileY = 322 + treeRandom() * 12;
+                    // Out of the swaying group, so the pile on the ground stays put.
+                    treeFallenLayer.appendChild(leaf.element);
+                }
+                if (leaf.state === 'falling') {
+                    leaf.flutter += 0.09;
+                    leaf.fallSpeed = Math.min(2.4, leaf.fallSpeed + 0.07);
+                    leaf.fallY += leaf.fallSpeed;
+                    leaf.fallX += (leaf.pileX - leaf.fallX) * 0.015 + Math.sin(leaf.flutter) * 1.3;
+                    leaf.rotation += 7;
+                    if (leaf.fallY >= leaf.pileY) {
+                        leaf.fallY = leaf.pileY;
+                        leaf.state = 'ground';
+                        leaf.rotation = (treeRandom() - 0.5) * 70 + 90;
+                    }
+                } else if (leaf.state === 'ground') {
+                    if (bareness >= leaf.dropAt - 0.05) continue;
+                    // Quiet again: the leaf lifts off the pile and floats home.
+                    leaf.state = 'rising';
+                    leaf.riseProgress = 0;
+                    leaf.riseFromX = leaf.fallX;
+                    leaf.riseFromY = leaf.fallY;
+                    leaf.riseFromRotation = leaf.rotation;
+                } else if (leaf.state === 'rising') {
+                    leaf.riseProgress = Math.min(1, leaf.riseProgress + 0.022);
+                    const progress = leaf.riseProgress;
+                    const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    const drift = Math.sin(progress * Math.PI) * 26 * (leaf.riseFromX < leaf.x ? -1 : 1);
+                    leaf.fallX = lerp(leaf.riseFromX, leaf.x, eased) + drift;
+                    leaf.fallY = lerp(leaf.riseFromY, leaf.y, eased);
+                    leaf.rotation = lerp(leaf.riseFromRotation, leaf.homeRotation, eased) + Math.sin(progress * Math.PI * 3) * 20 * (1 - eased);
+                    // Its colour runs back from red to the tree's colour right now.
+                    const treeColourNow = Math.pow(Math.min(1, bareness / leaf.dropAt), 1.4);
+                    setLeafColour(leaf, leafColour(lerp(1, treeColourNow, eased)));
+                    if (progress >= 1) {
+                        leaf.state = 'on';
+                        treeLeafLayer.appendChild(leaf.element);
+                        placeLeafOnBranch(leaf);
+                        continue;
+                    }
+                }
+                leaf.element.setAttribute('transform', `translate(${leaf.fallX.toFixed(1)},${leaf.fallY.toFixed(1)}) rotate(${leaf.rotation.toFixed(0)}) scale(${leaf.scale.toFixed(2)})`);
+            }
+        }
+
+        // --- 6.7 Snowfall behind the snowman; it thins while he melts ---
+        let snowFlakes = [];
+        let snowWidth = 0;
+        let snowHeight = 0;
+
+        function sizeNoiseSnow() {
+            const pixelRatio = window.devicePixelRatio || 1;
+            snowWidth = noiseSnowCanvas.clientWidth;
+            snowHeight = noiseSnowCanvas.clientHeight;
+            noiseSnowCanvas.width = Math.round(snowWidth * pixelRatio);
+            noiseSnowCanvas.height = Math.round(snowHeight * pixelRatio);
+            noiseSnowContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        }
+
+        function makeFlake(anywhere) {
+            return {
+                x: Math.random() * snowWidth,
+                y: anywhere ? Math.random() * snowHeight : -10,
+                radius: 1 + Math.random() * 2.6,
+                speed: 0.4 + Math.random() * 0.9,
+                phase: Math.random() * Math.PI * 2
+            };
+        }
+
+        function initNoiseSnow() {
+            sizeNoiseSnow();
+            snowFlakes = [];
+            if (isNoiseMode && noiseSettings.look === 'snowman') {
+                const flakeCount = reduceMotion.matches ? 24 : 84;
+                for (let index = 0; index < flakeCount; index++) snowFlakes.push(makeFlake(true));
+            }
+            noiseSnowContext.clearRect(0, 0, snowWidth, snowHeight);
+        }
+
+        function stepNoiseSnow(melt) {
+            if (!snowFlakes.length) return;
+            noiseSnowContext.clearRect(0, 0, snowWidth, snowHeight);
+            const speed = reduceMotion.matches ? 0.4 : 1;
+            const visibleShare = 1 - melt * 0.85;
+            noiseSnowContext.fillStyle = '#ffffff';
+            snowFlakes.forEach((flake, index) => {
+                flake.phase += 0.02;
+                flake.y += flake.speed * speed;
+                flake.x += Math.sin(flake.phase) * 0.4 * speed;
+                if (flake.y > snowHeight + 10) Object.assign(flake, makeFlake(false));
+                const isVisible = index / snowFlakes.length < visibleShare;
+                noiseSnowContext.globalAlpha = isVisible ? 0.75 * (0.4 + flake.radius / 5) : 0;
+                noiseSnowContext.beginPath();
+                noiseSnowContext.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+                noiseSnowContext.fill();
+            });
+            noiseSnowContext.globalAlpha = 1;
+        }
+
+        window.addEventListener('resize', () => {
+            if (isNoiseMode) sizeNoiseSnow();
+        });
+
+        // --- 6.8 Look picker (built like the Themes menu) ---
+        const NOISE_LOOK_OPTIONS = [
+            { v: 'bars', label: 'Bars' },
+            { v: 'face', label: 'Face' },
+            { v: 'tree', label: 'Tree' },
+            { v: 'snowman', label: 'Snowman' }
+        ];
+
+        // #preview on the URL shows every seasonal look, for testing.
+        function isNoisePreview() {
+            return location.hash === '#preview';
+        }
+
+        function setNoiseLook(look) {
+            noiseSettings.look = look;
+            saveNoiseSettings();
+            noiseStage.dataset.look = look;
+            noiseMeter.hidden = look !== 'bars';
+            noiseFace.hidden = look !== 'face';
+            noiseTree.hidden = look !== 'tree';
+            noiseSnowman.hidden = look !== 'snowman';
+            noiseStatusText = '';
+            initNoiseSnow();
+        }
+
+        // Hidden, not disabled, outside their month. Runs every minute so a
+        // page left open across the month change updates itself.
+        function refreshNoiseLooks() {
+            const look = TimrNoise.resolveLook(noiseSettings.look, new Date(), isNoisePreview());
+            if (look !== noiseSettings.look || noiseStage.dataset.look !== look) setNoiseLook(look);
+        }
+
+        function buildNoiseLookMenu() {
+            noiseLookMenu.innerHTML = '';
+            NOISE_LOOK_OPTIONS
+                .filter(option => TimrNoise.lookAvailable(option.v, new Date(), isNoisePreview()))
+                .forEach(option => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.setAttribute('role', 'menuitemradio');
+                    item.setAttribute('aria-current', String(option.v === noiseSettings.look));
+                    item.dataset.look = option.v;
+                    item.textContent = option.label;
+                    const month = TimrNoise.SEASONAL_LOOKS[option.v];
+                    if (month !== undefined) {
+                        const tag = document.createElement('span');
+                        tag.className = 'theme-tag';
+                        tag.textContent = new Date(2000, month).toLocaleString('en', { month: 'long' });
+                        item.appendChild(tag);
+                    }
+                    item.addEventListener('click', () => {
+                        setNoiseLook(option.v);
+                        closeNoiseLookMenu();
+                        noiseLookButton.focus();
+                    });
+                    noiseLookMenu.appendChild(item);
+                });
+        }
+
+        function openNoiseLookMenu() {
+            buildNoiseLookMenu();
+            noiseLookMenu.classList.remove('hidden');
+            noiseLookButton.setAttribute('aria-expanded', 'true');
+            const current = noiseLookMenu.querySelector('[aria-current="true"]') || noiseLookMenu.querySelector('button');
+            if (current) current.focus();
+        }
+
+        function closeNoiseLookMenu() {
+            if (noiseLookMenu.classList.contains('hidden')) return;
+            noiseLookMenu.classList.add('hidden');
+            noiseLookButton.setAttribute('aria-expanded', 'false');
+            scheduleCollapse(250);
+        }
+
+        noiseLookButton.addEventListener('click', () => {
+            if (noiseLookMenu.classList.contains('hidden')) openNoiseLookMenu();
+            else closeNoiseLookMenu();
+        });
+        document.addEventListener('click', (e) => {
+            if (noiseLookButton.contains(e.target) || noiseLookMenu.contains(e.target)) return;
+            closeNoiseLookMenu();
+        });
+        noiseLookMenu.addEventListener('keydown', (e) => {
+            const items = Array.from(noiseLookMenu.querySelectorAll('button'));
+            const index = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[(index + 1) % items.length].focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); items[(index - 1 + items.length) % items.length].focus(); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeNoiseLookMenu(); noiseLookButton.focus(); }
+        });
+
+        // --- 6.9 Settings and quiet-baseline modals ---
+        // Same look and keyboard rules as the custom-time modal.
+        const noiseModalHideTimers = new Map();
+        let noiseModalOpener = null;
+
+        function showNoiseModal(modal, box) {
+            clearTimeout(noiseModalHideTimers.get(modal));
+            noiseModalOpener = document.activeElement;
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95');
+            box.classList.add('scale-100');
+            controlBar.setAttribute('aria-hidden', 'true');
+            mainEl.setAttribute('aria-hidden', 'true');
+        }
+
+        function hideNoiseModal(modal, box) {
+            if (modal.classList.contains('hidden')) return;
+            modal.classList.add('opacity-0');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            controlBar.removeAttribute('aria-hidden');
+            mainEl.removeAttribute('aria-hidden');
+            noiseModalHideTimers.set(modal, setTimeout(() => { modal.classList.add('hidden'); }, 300));
+            if (noiseModalOpener && typeof noiseModalOpener.focus === 'function') noiseModalOpener.focus();
+            noiseModalOpener = null;
+            scheduleCollapse(350);
+        }
+
+        function isNoiseModalOpen(modal) {
+            return !modal.classList.contains('hidden') && !modal.classList.contains('opacity-0');
+        }
+
+        // collapseIsland asks this before folding the controls away.
+        function noiseHoldsIsland() {
+            return !noiseLookMenu.classList.contains('hidden')
+                || isNoiseModalOpen(noiseSettingsModal)
+                || isNoiseModalOpen(noiseCalibrateModal);
+        }
+
+        function sensitivityLabel(range) {
+            if (range <= 32) return 'high';
+            if (range <= 46) return 'medium';
+            return 'low';
+        }
+
+        const NOISE_SLIDERS = [
+            { id: 'noise-yellow-at', key: 'yellowAt', format: value => String(value) },
+            { id: 'noise-red-at', key: 'redAt', format: value => String(value) },
+            { id: 'noise-hold', key: 'hold', format: value => value.toFixed(1) + ' s' },
+            { id: 'noise-range', key: 'range', format: sensitivityLabel },
+            { id: 'noise-change-time', key: 'changeTime', format: value => value + ' s' }
+        ];
+
+        function syncNoiseSliders() {
+            NOISE_SLIDERS.forEach(slider => {
+                document.getElementById(slider.id).value = noiseSettings[slider.key];
+                document.getElementById(slider.id + '-out').textContent = slider.format(noiseSettings[slider.key]);
+            });
+        }
+
+        NOISE_SLIDERS.forEach(slider => {
+            document.getElementById(slider.id).addEventListener('input', (e) => {
+                noiseSettings[slider.key] = parseFloat(e.target.value);
+                // Keep yellow and red at least five points apart.
+                if (slider.key === 'yellowAt' && noiseSettings.yellowAt > noiseSettings.redAt - NOISE_MIN_GAP) {
+                    noiseSettings.redAt = Math.min(NOISE_LIMITS.redAt[1], noiseSettings.yellowAt + NOISE_MIN_GAP);
+                }
+                if (slider.key === 'redAt' && noiseSettings.redAt < noiseSettings.yellowAt + NOISE_MIN_GAP) {
+                    noiseSettings.yellowAt = Math.max(NOISE_LIMITS.yellowAt[0], noiseSettings.redAt - NOISE_MIN_GAP);
+                }
+                syncNoiseSliders();
+                paintNoiseZones();
+                saveNoiseSettings();
+            });
+        });
+
+        // The baseline lives in the settings box: it's set once per room, so
+        // it doesn't need a button of its own in the controls.
+        function syncBaselineButton() {
+            const micOn = noiseMicOn();
+            noiseBaselineButton.disabled = !micOn;
+            document.getElementById('noise-baseline-hint').textContent = micOn
+                ? 'Press while the room is quiet. It listens for 3 seconds.'
+                : 'Turn the mic on first, then set the quiet baseline.';
+        }
+
+        // Which microphone to listen to (Tom 2026-10-23), for classrooms with
+        // a USB mic. Remembered per browser; an unplugged choice falls back
+        // to the computer's default.
+        const noiseMicSelect = document.getElementById('noise-mic-select');
+        const noiseMicHint = document.getElementById('noise-mic-hint');
+
+        async function fillMicList() {
+            let inputs = [];
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                // Chrome adds "default" and "communications" entries that repeat
+                // a real mic; "Computer default" already covers them. Before the
+                // mic has been allowed once, ids and names come back empty.
+                inputs = devices.filter(device => device.kind === 'audioinput'
+                    && device.deviceId && device.label
+                    && device.deviceId !== 'default' && device.deviceId !== 'communications');
+            } catch (e) { inputs = []; }
+            noiseMicSelect.innerHTML = '';
+            noiseMicSelect.appendChild(new Option('Computer default', ''));
+            inputs.forEach(device => noiseMicSelect.appendChild(new Option(device.label, device.deviceId)));
+            const chosenIsPlugged = inputs.some(device => device.deviceId === noiseSettings.micId);
+            noiseMicSelect.value = chosenIsPlugged ? noiseSettings.micId : '';
+            if (!inputs.length) noiseMicHint.textContent = 'Turn the mic on once to see your microphones here.';
+            else if (noiseSettings.micId && !chosenIsPlugged) noiseMicHint.textContent = "Your chosen mic isn't plugged in, so Timr is using the default.";
+            else noiseMicHint.textContent = '';
+        }
+
+        noiseMicSelect.addEventListener('change', () => {
+            noiseSettings.micId = noiseMicSelect.value;
+            saveNoiseSettings();
+            if (!noiseMicOn()) {
+                noiseMicHint.textContent = '';
+                return;
+            }
+            // Switch straight away. Each mic hears the room differently, so
+            // the old baseline no longer fits.
+            stopNoiseMic();
+            startNoiseMic();
+            noiseMicHint.textContent = 'Switched. Set the quiet baseline again for this mic.';
+        });
+
+        if (navigator.mediaDevices) {
+            navigator.mediaDevices.addEventListener('devicechange', () => {
+                if (isNoiseModalOpen(noiseSettingsModal)) fillMicList();
+            });
+        }
+
+        function openNoiseSettings() {
+            closeNoiseLookMenu();
+            syncNoiseSliders();
+            syncBaselineButton();
+            fillMicList();
+            showNoiseModal(noiseSettingsModal, noiseSettingsBox);
+            if (noiseBaselineButton.disabled) document.getElementById('noise-yellow-at').focus();
+            else noiseBaselineButton.focus();
+        }
+
+        function closeNoiseSettings() {
+            hideNoiseModal(noiseSettingsModal, noiseSettingsBox);
+        }
+
+        noiseSettingsButton.addEventListener('click', openNoiseSettings);
+        document.getElementById('noise-settings-done').addEventListener('click', closeNoiseSettings);
+        noiseSettingsModal.addEventListener('click', (e) => {
+            if (e.target === noiseSettingsModal) closeNoiseSettings();
+        });
+        noiseSettingsModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeNoiseSettings(); return; }
+            if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); closeNoiseSettings(); return; }
+            if (e.key === 'Tab') {
+                const focusable = noiseSettingsBox.querySelectorAll('select, input, button:not(:disabled)');
+                const first = focusable[0], last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+
+        // A 3-second "Stay quiet" countdown; the median of what it hears
+        // becomes this room's baseline.
+        let calibrateTimer = null;
+
+        function startCalibration() {
+            closeNoiseLookMenu();
+            if (!noiseMicOn()) {
+                setNoiseNote('Turn the mic on first, then set the quiet baseline.', true);
+                return;
+            }
+            // Started from inside the settings box: swap one modal for the other.
+            hideNoiseModal(noiseSettingsModal, noiseSettingsBox);
+            const samples = [];
+            const startedAt = Date.now();
+            noiseCountdown.textContent = '3';
+            showNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
+            noiseCalibrateBox.focus();
+            clearInterval(calibrateTimer);
+            calibrateTimer = setInterval(() => {
+                if (!noiseMicOn()) { cancelCalibration(); return; }
+                const secondsLeft = 3 - (Date.now() - startedAt) / 1000;
+                noiseCountdown.textContent = String(Math.max(1, Math.ceil(secondsLeft)));
+                samples.push(readMicDb());
+                if (secondsLeft > 0) return;
+                clearInterval(calibrateTimer);
+                calibrateTimer = null;
+                noiseSettings.baseline = clampNumber(TimrNoise.medianOf(samples), NOISE_LIMITS.baseline[0], NOISE_LIMITS.baseline[1]);
+                saveNoiseSettings();
+                hideNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
+                setNoiseNote('Baseline set for this room.');
+                announce('Quiet baseline set.');
+            }, 50);
+        }
+
+        function cancelCalibration() {
+            clearInterval(calibrateTimer);
+            calibrateTimer = null;
+            hideNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
+        }
+
+        noiseBaselineButton.addEventListener('click', startCalibration);
+        noiseCalibrateModal.addEventListener('click', cancelCalibration);
+        noiseCalibrateModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); cancelCalibration(); }
+            else if (e.key === 'Tab') e.preventDefault();
+        });
+
+        // --- 6.10 Microphone ---
+        let noiseStream = null;
+        let noiseAudioContext = null;
+        let noiseAnalyser = null;
+        let noiseBuffer = null;
+        let noiseMicStarting = false;
+
+        function noiseMicOn() {
+            return Boolean(noiseAnalyser);
+        }
+
+        function showMicState() {
+            const isLive = noiseMicOn();
+            noiseMicLabel.textContent = isLive ? 'Mic on · nothing recorded' : 'Use mic';
+            noiseMicButton.classList.toggle('is-live', isLive);
+            noiseMicButton.classList.toggle('bg-purple-600', !isLive);
+            noiseMicButton.classList.toggle('hover:bg-purple-500', !isLive);
+            noiseMicButton.classList.toggle('bg-gray-800', isLive);
+            noiseMicButton.classList.toggle('hover:bg-purple-600', isLive);
+            syncBaselineButton();
+            updateIslandPill();
+        }
+
+        async function startNoiseMic() {
+            if (noiseMicStarting || noiseMicOn()) return;
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setNoiseNote("This browser can't use a microphone on this page.", true);
+                return;
+            }
+            noiseMicStarting = true;
+            try {
+                // Browser processing off, or the meter would flatten the very
+                // noise it is meant to show.
+                const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+                // "ideal", not "exact": if the chosen mic isn't plugged in,
+                // the browser falls back to the default instead of failing.
+                if (noiseSettings.micId) audio.deviceId = { ideal: noiseSettings.micId };
+                const stream = await navigator.mediaDevices.getUserMedia({ audio });
+                // The teacher left Noise mode, or turned the noise bar off,
+                // while the permission prompt was up.
+                if (!isNoiseMode && !noiseBarOn) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioContextClass();
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                audioContext.createMediaStreamSource(stream).connect(analyser);
+                if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+                noiseStream = stream;
+                noiseAudioContext = audioContext;
+                noiseAnalyser = analyser;
+                noiseBuffer = new Float32Array(analyser.fftSize);
+                // A USB mic pulled out mid-lesson ends its track. Without this
+                // the meter would sit on silence reading "Working voices".
+                stream.getAudioTracks().forEach(track => track.addEventListener('ended', handleMicDisconnected));
+                showMicState();
+                setNoiseNote('Listening. For a better reading, open the settings (the gear) and set a quiet baseline.');
+                announce('Microphone on. Nothing is recorded.');
+            } catch (err) {
+                const errorName = err && err.name;
+                if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+                    setNoiseNote(`The mic is blocked for this site. Click the icon at the left of the address bar, allow the microphone, then ${micRetryHint()}. School-managed Chromebooks can block the mic for every site; if so, ask your tech team.`, true);
+                } else {
+                    setNoiseNote(`No microphone found. Check that a mic is connected and switched on, then ${micRetryHint()}.`, true);
+                }
+            } finally {
+                noiseMicStarting = false;
+            }
+        }
+
+        // The retry button differs: "Use mic" on the Voice level screen,
+        // "Voice bar" under a timer.
+        function micRetryHint() {
+            return isNoiseMode ? 'press "Use mic" again' : 'turn Voice bar off and on again';
+        }
+
+        function handleMicDisconnected() {
+            if (!noiseMicOn()) return;
+            stopNoiseMic();
+            setNoiseNote(`The microphone was disconnected. Plug it back in or choose another, then ${micRetryHint()}.`, true);
+            announce('Microphone disconnected.');
+        }
+
+        function stopNoiseMic() {
+            cancelCalibration();
+            const wasOn = noiseMicOn();
+            if (noiseStream) noiseStream.getTracks().forEach(track => track.stop());
+            if (noiseAudioContext) noiseAudioContext.close().catch(() => {});
+            noiseStream = null;
+            noiseAudioContext = null;
+            noiseAnalyser = null;
+            noiseBuffer = null;
+            showMicState();
+            setNoiseNote(DEMO_NOTE);
+            if (wasOn) announce('Microphone off.');
+        }
+
+        noiseMicButton.addEventListener('click', () => {
+            if (!noiseMicOn()) {
+                startNoiseMic();
+                return;
+            }
+            // Turning the mic off here also takes the noise bar down, so the
+            // bar never comes back later with nothing to show.
+            if (noiseBarOn) setNoiseBar(false);
+            else stopNoiseMic();
+        });
+
+        function readMicDb() {
+            noiseAnalyser.getFloatTimeDomainData(noiseBuffer);
+            let sumOfSquares = 0;
+            for (let index = 0; index < noiseBuffer.length; index++) sumOfSquares += noiseBuffer[index] * noiseBuffer[index];
+            const rms = Math.sqrt(sumOfSquares / noiseBuffer.length);
+            return 20 * Math.log10(Math.max(rms, 1e-7));
+        }
+
+        // Demo classroom until the mic is on: quiet work, table talk, rowdy
+        // stretches and the odd dropped pencil case.
+        const DEMO_PLAN = [-52, -46, -36, -32, -24, -21, -22, -34, -48, -53, -52, -40, -26, -23, -44, -54];
+        let demoDb = -52;
+        let demoSpikeUntil = 0;
+
+        function readDemoDb(nowMs) {
+            demoDb += (DEMO_PLAN[Math.floor(nowMs / 4500) % DEMO_PLAN.length] - demoDb) * 0.04;
+            const wobble = (Math.random() - 0.5) * 6 + Math.sin(nowMs / 700) * 1.5;
+            if (nowMs > demoSpikeUntil + 6000 && Math.random() < 0.008) demoSpikeUntil = nowMs + 180;
+            return nowMs < demoSpikeUntil ? -14 : demoDb + wobble;
+        }
+
+        // --- 6.11 Meter loop ---
+        // A plain interval, not requestAnimationFrame: animation frames pause
+        // in some embedded and background contexts, which froze the prototype.
+        let noiseLoopTimer = null;
+        let noiseLastTick = 0;
+        let noiseSmooth = 0;
+        let noiseZoneHold = TimrNoise.createZoneHold();
+        let noiseShownZone = 'green';
+        let noiseWear = 0;
+        let noiseWearShown = 0;
+        let noiseFaceAmount = 0;
+        let noiseStatusText = '';
+
+        function noiseTick() {
+            const nowMs = performance.now();
+            const deltaSeconds = Math.min(0.2, (nowMs - noiseLastTick) / 1000);
+            noiseLastTick = nowMs;
+
+            const micOn = noiseMicOn();
+            // The noise bar under a real timer shows real readings only, never the demo.
+            if (!isNoiseMode && !micOn) {
+                drawNoiseBars(0);
+                noiseStripStatus.textContent = '';
+                return;
+            }
+            const rawDb = micOn ? readMicDb() : readDemoDb(nowMs);
+            // The demo always uses the default baseline, so a calibrated room
+            // doesn't make the demo look silent.
+            const baseline = micOn ? noiseSettings.baseline : NOISE_DEFAULTS.baseline;
+            const level = TimrNoise.levelFromDb(rawDb, baseline, noiseSettings.range);
+            noiseSmooth = TimrNoise.smoothLevel(noiseSmooth, level);
+            const zone = TimrNoise.zoneFor(noiseSmooth, noiseSettings.yellowAt, noiseSettings.redAt);
+            const shownZone = noiseZoneHold.update(zone, nowMs, noiseSettings.hold);
+
+            noiseWear = TimrNoise.stepWear(noiseWear, shownZone, deltaSeconds, noiseSettings.changeTime);
+            noiseWearShown += (noiseWear - noiseWearShown) * 0.15;
+
+            const look = noiseSettings.look;
+            const word = TimrNoise.statusWord(look, shownZone, noiseWear);
+            const barWord = TimrNoise.statusWord('bars', shownZone, noiseWear);
+            if (shownZone !== noiseShownZone) {
+                noiseShownZone = shownZone;
+                noiseStage.dataset.zone = shownZone;
+                noiseStrip.dataset.zone = shownZone;
+                // Only real readings are announced; the demo would chatter.
+                if (micOn) announce(isNoiseMode ? word : barWord);
+            }
+            if (word !== noiseStatusText) {
+                noiseStatusText = word;
+                noiseStatus.textContent = word;
+            }
+            if (barWord !== noiseStripStatus.textContent) noiseStripStatus.textContent = barWord;
+
+            // Under a timer only the bar is on screen; skip the pictures.
+            if (!isNoiseMode) {
+                drawNoiseBars(noiseSmooth);
+                return;
+            }
+            if (look === 'bars') {
+                drawNoiseBars(noiseSmooth);
+            } else if (look === 'face') {
+                // Follows the held zone, eased, so the face doesn't twitch.
+                let target = Math.min(0.3, noiseSmooth / 100);
+                if (shownZone === 'red') target = 1;
+                else if (shownZone === 'yellow') target = 0.55;
+                noiseFaceAmount += (target - noiseFaceAmount) * 0.12;
+                drawNoiseFace(noiseFaceAmount);
+            } else if (look === 'tree') {
+                drawNoiseTree(noiseWearShown, nowMs, noiseSmooth);
+            } else if (look === 'snowman') {
+                // Drips only while he is actually melting, which is red alone now.
+                drawNoiseSnowman(noiseWearShown, nowMs, shownZone === 'red');
+                stepNoiseSnow(noiseWearShown);
+            }
+        }
+
+        // Like the theme, the meter runs on the pop-out's clock while it is
+        // open, because the main tab behind the slides gets throttled.
+        let noiseLoopHost = window;
+
+        function startNoiseLoop() {
+            if (noiseLoopTimer) return;
+            noiseLastTick = performance.now();
+            noiseLoopHost = pipWindow || window;
+            noiseLoopTimer = noiseLoopHost.setInterval(() => {
+                try { noiseTick(); } catch (err) { console.error(err); }
+            }, 33);
+        }
+
+        function stopNoiseLoop() {
+            try { noiseLoopHost.clearInterval(noiseLoopTimer); } catch (e) { /* closed pop-out */ }
+            noiseLoopTimer = null;
+        }
+
+        // Called when the pop-out opens or closes.
+        function restartNoiseLoop() {
+            if (!noiseLoopTimer) return;
+            stopNoiseLoop();
+            startNoiseLoop();
+        }
+
+        // --- 6.12 Entering and leaving Noise mode (called by switchMode) ---
+        function setNoiseActive(active) {
+            document.body.classList.toggle('mode-noise', active);
+            if (active) {
+                refreshNoiseLooks();
+                initNoiseSnow();
+                if (!noiseMicOn()) setNoiseNote(DEMO_NOTE);
+                startNoiseLoop();
+                return;
+            }
+            closeNoiseLookMenu();
+            initNoiseSnow();
+            // With the noise bar on, the mic and meter carry on under the
+            // timer. Otherwise leaving Noise mode lets go of the microphone.
+            if (noiseBarOn) return;
+            hideNoiseModal(noiseSettingsModal, noiseSettingsBox);
+            stopNoiseMic();
+            stopNoiseLoop();
+        }
+
+        // --- 6.13 Noise bar under Timer, Stopwatch and Clock ---
+        // Turning it on asks for the mic straight away (the teacher just
+        // clicked); there is no demo under a real timer. Off on every reload,
+        // because the mic is never requested on load.
+        let noiseBarOn = false;
+
+        function setNoiseBar(on) {
+            noiseBarOn = on;
+            document.body.classList.toggle('noise-bar-on', on);
+            noiseBarButton.setAttribute('aria-pressed', String(on));
+            noiseStrip.hidden = !on;
+            if (on) {
+                noiseStripStatus.textContent = '';
+                startNoiseLoop();
+                startNoiseMic();
+            } else {
+                hideNoiseModal(noiseSettingsModal, noiseSettingsBox);
+                stopNoiseMic();
+                if (!isNoiseMode) stopNoiseLoop();
+            }
+            fitPopOutText();
+        }
+
+        noiseBarButton.addEventListener('click', () => setNoiseBar(!noiseBarOn));
+
+        function noiseIslandLabel() {
+            return noiseMicOn() ? 'Voice level · Listening' : 'Voice level · Demo';
+        }
+
+        window.TimrNoise = { ...TimrNoise, isMicOn: noiseMicOn };
+
+        paintNoiseZones();
+        drawNoiseFace(0);
+        drawNoiseSnowman(0, 0, false);
+        setNoiseLook(TimrNoise.resolveLook(noiseSettings.look, new Date(), isNoisePreview()));
+        setInterval(refreshNoiseLooks, 60000);
+        window.addEventListener('hashchange', refreshNoiseLooks);
     </script>
 </body>
 </html>
