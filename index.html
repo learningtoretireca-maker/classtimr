@@ -657,6 +657,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </button>
             </div>
+
+            <button id="btn-privacy" type="button" class="px-3 py-1.5 text-gray-400 hover:text-white text-sm transition">Privacy</button>
         </div>
     </div>
 
@@ -718,6 +720,280 @@
         </div>
     </div>
 
+    <!-- What Timr sends and what it never does. Same look as the other modals. -->
+    <div id="privacy-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300 space-y-4" id="privacy-box" role="dialog" aria-modal="true" aria-labelledby="privacy-title" style="width: min(30rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow-y: auto">
+            <h3 id="privacy-title" class="text-xl text-white font-semibold mb-2 tracking-wide">Privacy</h3>
+            <p class="text-sm text-gray-300"><strong class="font-semibold text-white">Daily tallies.</strong> Each day, Timr adds one to a tally in Classhelpr's database at Supabase, in Canada (Montreal), the first time a browser opens it. It does the same the first time that browser starts a timer or the stopwatch, shows the clock, turns on the voice meter or voice bar, picks a theme, goes full screen or pops the timer out, and when a countdown reaches zero. A tally is a date, the action and a number. It holds no name, no device details and nothing about who. No cookie is set for it. Your browser remembers the date it was last counted, so Timr counts each browser once per day, week and month. That date never leaves your browser.</p>
+            <p class="text-sm text-gray-300"><strong class="font-semibold text-white">The microphone's sound never leaves your computer.</strong> Timr listens in memory and never records, stores or sends it.</p>
+            <p class="text-sm text-gray-300">Do Not Track and Global Privacy Control stop the tallies, and so does opening timr.classhelpr.com/?nocount=1.</p>
+            <div class="flex w-full mt-1">
+                <button id="privacy-done" type="button" class="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] transition">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 0. DAILY TALLIES ---
+        // Anonymous usage counts for the whole suite (Tom 2026-10-26), on the
+        // same rules as ClassMapr's src/features/usage/ping.ts. Timr has no
+        // server, so each count is one call straight to bump_suite_usage on
+        // Classhelpr's Supabase project in Montreal. The call carries the event
+        // name and nothing else: no id, no cookie, no referrer, no settings.
+        // The database files it under today's Edmonton date and refuses any
+        // event its allowlist doesn't name.
+        //
+        // What makes a tally mean "browsers that did X" rather than "times X
+        // was pressed" is the one note this browser keeps for itself:
+        //
+        //   classtimr:usage = {
+        //     day, week, month,   // the periods this browser was last counted active in
+        //     doneDay, done,      // the action events already counted on doneDay
+        //     off,                // ?nocount=1 was visited here
+        //   }
+        //
+        // The note holds dates and event names and never leaves the browser.
+        // Everything here fails silently and nothing waits on it: counting
+        // must never be the reason a timer stutters. This block runs first so
+        // every later script can call countOncePerDay.
+
+        const TALLY_URL = 'https://wngamnvtotzuyiohtakc.supabase.co/rest/v1/rpc/bump_suite_usage';
+        // Publishable by design: the anon role it stands for can call
+        // bump_suite_usage and cannot read or write the table itself.
+        const TALLY_KEY = 'sb_publishable_Uv--_PkjSjCVh52hmqsiwQ_GthPhyra';
+        const USAGE_KEY = 'classtimr:usage';
+        const USAGE_NOTICE_MS = 5000;
+
+        // The same list sits in bump_suite_usage (supabase/migrations), which
+        // is the copy that can't be skipped. This one stops a typo or a theme
+        // the database doesn't know from sending at all. Change both together:
+        // a new theme counts only once a migration adds it there.
+        const TIMR_EVENTS = [
+            'active-day', 'active-week', 'active-month',
+            'timer-started-preset', 'timer-started-custom', 'timer-finished',
+            'stopwatch-started', 'clock-shown',
+            'noise-meter-on', 'voice-bar-on',
+            'full-screen', 'pop-out',
+            'theme-leaves', 'theme-candles', 'theme-space', 'theme-ocean',
+            'theme-cyber', 'theme-biolum', 'theme-kelp', 'theme-dna', 'theme-koi',
+            'theme-magnetic', 'theme-neural', 'theme-hadron', 'theme-quantum',
+            // November and December candidates (plans/monthly-src), listed
+            // ahead of the build so whichever ships counts from its first day.
+            'theme-aurora', 'theme-poppies', 'theme-diyas', 'theme-rain', 'theme-frost',
+            'theme-village', 'theme-pond', 'theme-window', 'theme-sleigh',
+            'theme-snowfall', 'theme-lights'
+        ];
+
+        // Day, week and month in America/Edmonton time, so they match a
+        // school day. Weeks are ISO weeks, Monday to Sunday.
+        const edmontonDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Edmonton', year: 'numeric', month: '2-digit', day: '2-digit'
+        });
+
+        function isoWeek(day) {
+            const [year, month, date] = day.split('-').map(Number);
+            const utc = new Date(Date.UTC(year, month - 1, date));
+            // Monday = 1 … Sunday = 7. The Thursday of this week decides the ISO year.
+            const weekday = utc.getUTCDay() || 7;
+            utc.setUTCDate(utc.getUTCDate() + 4 - weekday);
+            const isoYear = utc.getUTCFullYear();
+            const yearStart = Date.UTC(isoYear, 0, 1);
+            const week = Math.ceil(((utc.getTime() - yearStart) / 86400000 + 1) / 7);
+            return `${isoYear}-W${String(week).padStart(2, '0')}`;
+        }
+
+        function periodOf(now) {
+            const day = edmontonDate.format(now);
+            return { day, week: isoWeek(day), month: day.slice(0, 7) };
+        }
+
+        // Used only when localStorage throws (private mode, blocked storage).
+        // It resets on reload, so such a browser counts once per page load
+        // instead of once per day: a small over-count, never one per press.
+        const memoryNote = {};
+        let usageStorageWorks = true;
+
+        function readUsageNote() {
+            if (!usageStorageWorks) return memoryNote;
+            try {
+                const raw = localStorage.getItem(USAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (e) {
+                usageStorageWorks = false;
+                return memoryNote;
+            }
+        }
+
+        function writeUsageNote(note) {
+            if (!usageStorageWorks) {
+                Object.assign(memoryNote, note);
+                return;
+            }
+            try {
+                localStorage.setItem(USAGE_KEY, JSON.stringify(note));
+            } catch (e) {
+                usageStorageWorks = false;
+                Object.assign(memoryNote, note);
+            }
+        }
+
+        // Off on localhost unless the address has ?countlocal=1, so
+        // development stays out of the live numbers. Off for Do Not Track,
+        // Global Privacy Control and ?nocount=1. Off while offline, before
+        // the note is written, so the count happens once the browser is back.
+        function countingHere() {
+            const host = location.hostname;
+            const local = host === 'localhost' || host === '127.0.0.1';
+            if (local && new URLSearchParams(location.search).get('countlocal') !== '1') return false;
+            if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return false;
+            if (navigator.globalPrivacyControl === true) return false;
+            if (navigator.onLine === false) return false;
+            return readUsageNote().off !== true;
+        }
+
+        // Fire and forget. Never awaited, never throws. fetch rather than
+        // sendBeacon, which can't carry the apikey header; keepalive lets it
+        // finish if the tab closes straight after.
+        function sendTally(event) {
+            try {
+                fetch(TALLY_URL, {
+                    method: 'POST',
+                    keepalive: true,
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer',
+                    headers: { apikey: TALLY_KEY, 'content-type': 'application/json' },
+                    body: JSON.stringify({ p_app: 'timr', p_event: event })
+                }).catch(() => {
+                    // Offline or blocked. Dropped, not queued.
+                });
+            } catch (e) {
+                // Never surface.
+            }
+        }
+
+        // Count an action once per browser per day.
+        function countOncePerDay(event) {
+            try {
+                if (!TIMR_EVENTS.includes(event) || !countingHere()) return;
+                const { day } = periodOf(new Date());
+                const note = readUsageNote();
+                const done = note.doneDay === day && Array.isArray(note.done) ? note.done : [];
+                if (done.includes(event)) return;
+                writeUsageNote({ ...note, doneDay: day, done: [...done, event] });
+                sendTally(event);
+            } catch (e) {
+                // Never surface.
+            }
+        }
+
+        // Count this browser as active today, this week and this month, each
+        // at most once. Timr has no sign-in, so there is no free/Pro split.
+        function countActive() {
+            try {
+                if (!countingHere()) return;
+                const now = periodOf(new Date());
+                const note = readUsageNote();
+                const due = [];
+                if (note.day !== now.day) due.push('active-day');
+                if (note.week !== now.week) due.push('active-week');
+                if (note.month !== now.month) due.push('active-month');
+                if (due.length === 0) return;
+                writeUsageNote({ ...note, day: now.day, week: now.week, month: now.month });
+                due.forEach(sendTally);
+            } catch (e) {
+                // Never surface.
+            }
+        }
+
+        // ?nocount=1 stops counting in this browser and ?nocount=0 starts it
+        // again. Returns what changed so the page can say so once, or null.
+        function applyNoCountParam(search) {
+            try {
+                const value = new URLSearchParams(search).get('nocount');
+                if (value !== '1' && value !== '0') return null;
+                const note = readUsageNote();
+                if (value === '1') {
+                    writeUsageNote({ ...note, off: true });
+                    return 'off';
+                }
+                const rest = { ...note };
+                delete rest.off;
+                if (usageStorageWorks) localStorage.setItem(USAGE_KEY, JSON.stringify(rest));
+                else delete memoryNote.off;
+                return 'on';
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function showUsageNotice(change) {
+            const notice = document.createElement('div');
+            notice.id = 'usage-notice';
+            notice.setAttribute('role', 'status');
+            notice.className = 'bg-gray-900 border border-gray-700 text-white text-sm font-semibold';
+            notice.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:60;padding:0.625rem 1rem;border-radius:0.75rem';
+            if (change === 'off') {
+                notice.textContent = 'Counting is off in this browser.';
+            } else {
+                notice.textContent = 'Counting is back on in this browser.';
+            }
+            document.body.appendChild(notice);
+            setTimeout(() => notice.remove(), USAGE_NOTICE_MS);
+        }
+
+        // For the e2e tests, like window.TimrNoise.
+        window.TimrUsage = { periodOf, isoWeek, events: TIMR_EVENTS };
+
+        // Before counting, so the visit that turns counting off isn't counted.
+        const usageChange = applyNoCountParam(location.search);
+        countActive();
+        if (usageChange) showUsageNotice(usageChange);
+
+        // The Privacy modal, opened from the island. controlBar, mainEl and
+        // scheduleCollapse belong to the next script; nothing here touches
+        // them until a click, by which time it has run.
+        const privacyModal = document.getElementById('privacy-modal');
+        const privacyBox = document.getElementById('privacy-box');
+        const privacyDone = document.getElementById('privacy-done');
+        let privacyOpener = null;
+
+        function showPrivacy() {
+            privacyOpener = document.activeElement;
+            privacyModal.classList.remove('hidden');
+            void privacyModal.offsetWidth;
+            privacyModal.classList.remove('opacity-0');
+            privacyBox.classList.remove('scale-95');
+            privacyBox.classList.add('scale-100');
+            controlBar.setAttribute('aria-hidden', 'true');
+            mainEl.setAttribute('aria-hidden', 'true');
+            privacyDone.focus();
+        }
+
+        function hidePrivacy() {
+            privacyModal.classList.add('opacity-0');
+            privacyBox.classList.remove('scale-100');
+            privacyBox.classList.add('scale-95');
+            controlBar.removeAttribute('aria-hidden');
+            mainEl.removeAttribute('aria-hidden');
+            setTimeout(() => { privacyModal.classList.add('hidden'); }, 300);
+            if (privacyOpener && typeof privacyOpener.focus === 'function') privacyOpener.focus();
+            privacyOpener = null;
+            // After the 300ms fade, or collapseIsland sees the modal open.
+            scheduleCollapse(350);
+        }
+
+        document.getElementById('btn-privacy').addEventListener('click', showPrivacy);
+        privacyDone.addEventListener('click', hidePrivacy);
+        privacyModal.addEventListener('click', (e) => {
+            if (e.target === privacyModal) hidePrivacy();
+        });
+        // Done is the only control, so Tab stays on it.
+        privacyModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); hidePrivacy(); return; }
+            if (e.key === 'Tab') { e.preventDefault(); privacyDone.focus(); }
+        });
+    </script>
     <script>
         // --- 1. TIMER LOGIC ---
         // remainingMs / elapsedMs are the source of truth; timeRemaining and
@@ -733,6 +1009,9 @@
         let isStopwatchMode = false;
         let isClockMode = false;
         let isNoiseMode = false;
+        // Where the countdown's length came from, for the daily tallies. The
+        // 15:00 on load is the 15 Min preset.
+        let durationSource = 'preset';
         let clockInterval = null;
         let elapsedTime = 0;
         let timerStartedAt = null;  // Date.now() when timer was started
@@ -858,6 +1137,7 @@
             showPlayButton();
             timeDisplay.classList.add('timer-zero');
             announce("Time's up");
+            countOncePerDay('timer-finished');
             lastAnnouncedSecond = null;
             // The flash goes on an overlay above the canvas. Writing it to
             // document.body did nothing — the canvas repaints an opaque fill
@@ -894,6 +1174,13 @@
             timerInterval = setInterval(isStopwatchMode ? tickStopwatch : tickCountdown, 250);
             isRunning = true;
             showPauseButton();
+            if (isStopwatchMode) {
+                countOncePerDay('stopwatch-started');
+            } else if (durationSource === 'custom') {
+                countOncePerDay('timer-started-custom');
+            } else {
+                countOncePerDay('timer-started-preset');
+            }
         }
 
         // Tick once before stopping. The stored value is floored to whole
@@ -1006,6 +1293,7 @@
                 playControls.style.display = 'none';
                 clockInterval = setInterval(updateClockDisplay, 1000);
                 updateClockDisplay();
+                countOncePerDay('clock-shown');
             } else {
                 playControls.style.display = '';
                 if (isStopwatchMode) {
@@ -1018,6 +1306,7 @@
         }
 
         function setPreset(minutes) {
+            durationSource = 'preset';
             applyDuration(minutes * 60);
         }
 
@@ -1095,6 +1384,8 @@
                 customError.textContent = 'Enter at least one second.';
                 return;
             }
+            // Before applyDuration, which restarts a running timer.
+            durationSource = 'custom';
             applyDuration(total);
             closeCustomTimeModal();
         }
@@ -1164,6 +1455,7 @@
             if (island.matches(':hover') || island.querySelector(':focus-visible')) return;
             if (!themeMenu.classList.contains('hidden')) return;
             if (!customModal.classList.contains('hidden')) return;
+            if (!privacyModal.classList.contains('hidden')) return;
             if (noiseHoldsIsland()) return;
             morphIsland(() => island.classList.remove('is-expanded'));
             controlBar.inert = true;
@@ -1232,7 +1524,9 @@
         // --- 3. FULLSCREEN LOGIC ---
         function toggleFullScreen() {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
+                document.documentElement.requestFullscreen().then(() => {
+                    countOncePerDay('full-screen');
+                }).catch(err => {
                     console.log(`Error attempting to enable fullscreen: ${err.message}`);
                 });
             } else {
@@ -1271,6 +1565,7 @@
                 return;
             }
             buildPopOut();
+            countOncePerDay('pop-out');
         }
 
         function buildPopOut() {
@@ -3070,6 +3365,7 @@
                 }
                 item.addEventListener('click', () => {
                     applyTheme(t.v);
+                    countOncePerDay('theme-' + t.v);
                     closeThemeMenu();
                     themeButton.focus();
                 });
@@ -4128,7 +4424,9 @@
                 stream.getAudioTracks().forEach(track => track.addEventListener('ended', handleMicDisconnected));
                 showMicState();
                 setNoiseNote('Listening. For a better reading, open the settings (the gear) and set a quiet baseline.');
-                announce('Microphone on. Nothing is recorded.');
+                announce('Microphone on. Nothing is recorded, and no sound leaves this computer.');
+                // The voice bar counts as voice-bar-on when its button is pressed.
+                if (isNoiseMode) countOncePerDay('noise-meter-on');
             } catch (err) {
                 const errorName = err && err.name;
                 if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
@@ -4344,7 +4642,11 @@
             fitPopOutText();
         }
 
-        noiseBarButton.addEventListener('click', () => setNoiseBar(!noiseBarOn));
+        noiseBarButton.addEventListener('click', () => {
+            const turningOn = !noiseBarOn;
+            setNoiseBar(turningOn);
+            if (turningOn) countOncePerDay('voice-bar-on');
+        });
 
         function noiseIslandLabel() {
             return noiseMicOn() ? 'Voice level · Listening' : 'Voice level · Demo';
