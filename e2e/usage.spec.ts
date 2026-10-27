@@ -240,6 +240,12 @@ test.describe("Daily tallies: lists and calendar", () => {
       themes: (eval("THEMES") as { v: string }[]).map((theme) => theme.v),
     }));
     for (const theme of themes) expect(pageEvents).toContain(`theme-${theme}`);
+    // November and December, allowed before they ship (keys from plans/monthly-src).
+    const upcoming = [
+      "aurora", "poppies", "diyas", "rain", "frost",
+      "village", "pond", "window", "sleigh", "snowfall", "lights",
+    ];
+    for (const theme of upcoming) expect(pageEvents).toContain(`theme-${theme}`);
 
     const migration = readFileSync(
       join(__dirname, "..", "supabase", "migrations", "20261027120000_timr_usage_events.sql"),

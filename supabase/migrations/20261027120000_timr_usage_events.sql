@@ -9,7 +9,9 @@
 -- stand live. Whoever replaces this function next copies both lists.
 --
 -- The same list sits in TIMR_EVENTS in index.html (section 0). A theme counts
--- only once it is named here, so a new monthly theme needs a migration too.
+-- only once it is named here. November's and December's candidate themes
+-- (classtimr plans/monthly-src) are listed already, so whichever ship count
+-- from day one; any other new theme needs a migration.
 
 create or replace function public.bump_suite_usage(p_app text, p_event text)
 returns boolean
@@ -53,7 +55,11 @@ begin
       'full-screen', 'pop-out',
       'theme-leaves', 'theme-candles', 'theme-space', 'theme-ocean',
       'theme-cyber', 'theme-biolum', 'theme-kelp', 'theme-dna', 'theme-koi',
-      'theme-magnetic', 'theme-neural', 'theme-hadron', 'theme-quantum'
+      'theme-magnetic', 'theme-neural', 'theme-hadron', 'theme-quantum',
+      -- November and December candidates, listed before they ship.
+      'theme-aurora', 'theme-poppies', 'theme-diyas', 'theme-rain', 'theme-frost',
+      'theme-village', 'theme-pond', 'theme-window', 'theme-sleigh',
+      'theme-snowfall', 'theme-lights'
     ])) then
       return false;
     end if;
