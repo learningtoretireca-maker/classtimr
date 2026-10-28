@@ -38,6 +38,39 @@ function events(tallies: Tally[]): string[] {
   return tallies.map((tally) => String(tally.body.p_event));
 }
 
+type Answer = { status: number; body: string } | "drop";
+const COUNTED: Answer = { status: 200, body: "true" };
+
+// Like recordTallies, but answers each event however the test says: a
+// status and body, or "drop" for a request lost on the way.
+async function answerTallies(page: Page, answer: (event: string) => Answer): Promise<string[]> {
+  const sent: string[] = [];
+  await page.route(`${SUPABASE}/**`, async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST") {
+      await route.fulfill({ status: 200, headers: corsHeaders, body: "" });
+      return;
+    }
+    const event = String(request.postDataJSON().p_event);
+    sent.push(event);
+    const reply = answer(event);
+    if (reply === "drop") {
+      await route.abort("internetdisconnected");
+      return;
+    }
+    await route.fulfill({ status: reply.status, headers: corsHeaders, contentType: "application/json", body: reply.body });
+  });
+  return sent;
+}
+
+async function usageNote(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => JSON.parse(localStorage.getItem("classtimr:usage") || "{}"));
+}
+
+async function noteKeys(page: Page): Promise<string[]> {
+  return Object.keys(await usageNote(page)).sort();
+}
+
 // The island folds away after a modal closes, so hover it back open first.
 async function startTimer(page: Page) {
   await expect(page.locator("#custom-time-modal")).toBeHidden();
@@ -72,7 +105,8 @@ test.describe("Daily tallies: what is sent", () => {
       expect(tally.headers.referer).toBeUndefined();
     }
 
-    // Same day, same browser: counted already.
+    // Same day, same browser: counted already, once the answers are noted.
+    await expect.poll(() => noteKeys(page)).toEqual(["day", "month", "week"]);
     await page.reload();
     await settle(page);
     expect(tallies.length).toBe(3);
@@ -82,8 +116,8 @@ test.describe("Daily tallies: what is sent", () => {
     await recordTallies(page);
     await page.goto(COUNTING);
     await startTimer(page);
-    const note = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr:usage") || "{}"));
-    expect(Object.keys(note).sort()).toEqual(["day", "done", "doneDay", "month", "week"]);
+    await expect.poll(() => noteKeys(page)).toEqual(["day", "done", "doneDay", "month", "week"]);
+    const note = await usageNote(page);
     expect(note.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(note.doneDay).toBe(note.day);
     expect(note.week).toMatch(/^\d{4}-W\d{2}$/);
@@ -138,6 +172,78 @@ test.describe("Daily tallies: what is sent", () => {
     expect(events(tallies)).toEqual(
       expect.arrayContaining(["stopwatch-started", "clock-shown", "theme-ocean", "timer-started-custom"])
     );
+  });
+});
+
+// The note says what the database has confirmed, never what was only sent,
+// so a lost request is tried again rather than missing for good.
+test.describe("Daily tallies: noted only once counted", () => {
+  test("a counted send notes the day, week, month and the action", async ({ page }) => {
+    await answerTallies(page, () => COUNTED);
+    await page.goto(COUNTING);
+    const today = await page.evaluate(() => (window as any).TimrUsage.periodOf(new Date()));
+    await expect.poll(() => usageNote(page)).toEqual(today);
+    await startTimer(page);
+    await expect.poll(() => usageNote(page)).toEqual({ ...today, doneDay: today.day, done: ["timer-started-preset"] });
+  });
+
+  test("a failed send notes nothing and is sent again on the next visit", async ({ page }) => {
+    let failing = true;
+    const sent = await answerTallies(page, () => (failing ? { status: 503, body: "" } : COUNTED));
+    await page.goto(COUNTING);
+    await expect.poll(() => sent.length).toBe(3);
+    await startTimer(page);
+    await expect.poll(() => sent).toContain("timer-started-preset");
+    await settle(page);
+    expect(await usageNote(page)).toEqual({});
+
+    // The next visit, with the database answering again.
+    failing = false;
+    await page.reload();
+    await expect.poll(() => sent.slice(4).sort()).toEqual(["active-day", "active-month", "active-week"]);
+    await expect.poll(() => noteKeys(page)).toEqual(["day", "month", "week"]);
+    await startTimer(page);
+    await expect.poll(() => sent.slice(7)).toEqual(["timer-started-preset"]);
+    await expect.poll(() => usageNote(page)).toMatchObject({ done: ["timer-started-preset"] });
+  });
+
+  test("a refusal from the database is not noted either", async ({ page }) => {
+    await answerTallies(page, () => ({ status: 200, body: "false" }));
+    await page.goto(COUNTING);
+    await settle(page);
+    expect(await usageNote(page)).toEqual({});
+  });
+
+  test("a lost active-month alone is sent again, so week and month stay equal", async ({ page }) => {
+    let monthLost = true;
+    const sent = await answerTallies(page, (event) => (event === "active-month" && monthLost ? "drop" : COUNTED));
+    await page.goto(COUNTING);
+    await expect.poll(() => sent.length).toBe(3);
+    await expect.poll(() => noteKeys(page)).toEqual(["day", "week"]);
+
+    monthLost = false;
+    await page.reload();
+    await expect.poll(() => sent.slice(3)).toEqual(["active-month"]);
+    await expect.poll(() => noteKeys(page)).toEqual(["day", "month", "week"]);
+
+    await page.reload();
+    await settle(page);
+    expect(sent).toHaveLength(4);
+  });
+
+  test("?nocount=1 still stops everything, even with a send left to retry", async ({ page }) => {
+    const sent = await answerTallies(page, () => "drop");
+    await page.goto(COUNTING);
+    await expect.poll(() => sent.length).toBe(3);
+    await settle(page);
+
+    await page.goto(`${COUNTING}&nocount=1`);
+    await startTimer(page);
+    await settle(page);
+    await page.goto(COUNTING);
+    await startTimer(page);
+    await settle(page);
+    expect(sent).toHaveLength(3);
   });
 });
 

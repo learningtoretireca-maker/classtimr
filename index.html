@@ -747,8 +747,8 @@
         // was pressed" is the one note this browser keeps for itself:
         //
         //   classtimr:usage = {
-        //     day, week, month,   // the periods this browser was last counted active in
-        //     doneDay, done,      // the action events already counted on doneDay
+        //     day, week, month,   // the periods the database confirmed this browser active in
+        //     doneDay, done,      // the action events the database confirmed on doneDay
         //     off,                // ?nocount=1 was visited here
         //   }
         //
@@ -852,24 +852,48 @@
             return readUsageNote().off !== true;
         }
 
-        // Fire and forget. Never awaited, never throws. fetch rather than
+        // Resolves true only when the database answers that it counted the
+        // event; a refusal, an error status or a dropped request resolves
+        // false. Never rejects, and nothing waits on it. fetch rather than
         // sendBeacon, which can't carry the apikey header; keepalive lets it
         // finish if the tab closes straight after.
         function sendTally(event) {
             try {
-                fetch(TALLY_URL, {
+                return fetch(TALLY_URL, {
                     method: 'POST',
                     keepalive: true,
                     credentials: 'omit',
                     referrerPolicy: 'no-referrer',
                     headers: { apikey: TALLY_KEY, 'content-type': 'application/json' },
                     body: JSON.stringify({ p_app: 'timr', p_event: event })
-                }).catch(() => {
-                    // Offline or blocked. Dropped, not queued.
-                });
+                })
+                    .then((response) => (response.ok ? response.json() : false))
+                    .then((counted) => counted === true)
+                    .catch(() => false);
             } catch (e) {
-                // Never surface.
+                return Promise.resolve(false);
             }
+        }
+
+        // Events sent and not yet answered, so a second press while the first
+        // is on its way doesn't count twice.
+        const talliesInFlight = new Set();
+
+        // The note is written only once the database confirms the count
+        // (Tom 2026-10-28). Before, it was written first, so a request lost
+        // on the way (a wifi blip, a tab closed mid-send) was never retried:
+        // one lost active-month left Timr's month a browser behind its week.
+        // Now a lost request leaves the note as it was and the next visit or
+        // press sends it again.
+        function sendThenNote(event, noteCounted) {
+            if (talliesInFlight.has(event)) return;
+            talliesInFlight.add(event);
+            sendTally(event).then((counted) => {
+                talliesInFlight.delete(event);
+                if (counted) noteCounted();
+            }).catch(() => {
+                // Never surface.
+            });
         }
 
         // Count an action once per browser per day.
@@ -877,11 +901,14 @@
             try {
                 if (!TIMR_EVENTS.includes(event) || !countingHere()) return;
                 const { day } = periodOf(new Date());
-                const note = readUsageNote();
-                const done = note.doneDay === day && Array.isArray(note.done) ? note.done : [];
-                if (done.includes(event)) return;
-                writeUsageNote({ ...note, doneDay: day, done: [...done, event] });
-                sendTally(event);
+                const doneOn = (note) => (note.doneDay === day && Array.isArray(note.done) ? note.done : []);
+                if (doneOn(readUsageNote()).includes(event)) return;
+                sendThenNote(event, () => {
+                    // Read again: other tallies may have landed meanwhile.
+                    const note = readUsageNote();
+                    const done = doneOn(note);
+                    if (!done.includes(event)) writeUsageNote({ ...note, doneDay: day, done: [...done, event] });
+                });
             } catch (e) {
                 // Never surface.
             }
@@ -889,18 +916,21 @@
 
         // Count this browser as active today, this week and this month, each
         // at most once. Timr has no sign-in, so there is no free/Pro split.
+        // Each period is noted on its own answer, so a lost active-month is
+        // sent again next visit even though its day and week went through.
+        const ACTIVE_PERIODS = [['day', 'active-day'], ['week', 'active-week'], ['month', 'active-month']];
+
         function countActive() {
             try {
                 if (!countingHere()) return;
                 const now = periodOf(new Date());
                 const note = readUsageNote();
-                const due = [];
-                if (note.day !== now.day) due.push('active-day');
-                if (note.week !== now.week) due.push('active-week');
-                if (note.month !== now.month) due.push('active-month');
-                if (due.length === 0) return;
-                writeUsageNote({ ...note, day: now.day, week: now.week, month: now.month });
-                due.forEach(sendTally);
+                ACTIVE_PERIODS.forEach(([period, event]) => {
+                    if (note[period] === now[period]) return;
+                    sendThenNote(event, () => {
+                        writeUsageNote({ ...readUsageNote(), [period]: now[period] });
+                    });
+                });
             } catch (e) {
                 // Never surface.
             }
