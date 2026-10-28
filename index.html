@@ -692,7 +692,7 @@
                 <span id="noise-mic-hint" class="text-sm text-gray-400"></span>
             </label>
             <div class="noise-field">
-                <button id="btn-noise-baseline" type="button" class="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold transition">Set quiet baseline</button>
+                <button id="btn-noise-baseline" type="button" class="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold transition">Tune to room</button>
                 <p id="noise-baseline-hint" class="text-sm text-gray-400"></p>
             </div>
             <label class="noise-field" for="noise-yellow-at"><span class="noise-field-row">Yellow starts at <output id="noise-yellow-at-out"></output></span>
@@ -702,7 +702,7 @@
             <label class="noise-field" for="noise-hold"><span class="noise-field-row">Must stay loud for <output id="noise-hold-out"></output></span>
                 <input type="range" id="noise-hold" min="0" max="5" step="0.5"></label>
             <label class="noise-field" for="noise-range"><span class="noise-field-row">Sensitivity <output id="noise-range-out"></output></span>
-                <input type="range" id="noise-range" min="25" max="60" step="1"></label>
+                <input type="range" id="noise-range" min="25" max="90" step="1"></label>
             <label class="noise-field" for="noise-change-time"><span class="noise-field-row">Tree and snowman change over <output id="noise-change-time-out"></output></span>
                 <input type="range" id="noise-change-time" min="5" max="60" step="5"></label>
             <p class="text-sm text-gray-400">Hold time stops one dropped textbook or one laugh from setting it off.</p>
@@ -716,7 +716,7 @@
         <div class="bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl flex flex-col items-center transform scale-95 transition-transform duration-300" id="noise-calibrate-box" role="dialog" aria-modal="true" aria-labelledby="noise-calibrate-title" tabindex="-1">
             <h3 id="noise-calibrate-title" class="text-xl text-white font-semibold mb-2 tracking-wide">Stay quiet</h3>
             <div id="noise-countdown" class="font-digital text-white" aria-hidden="true">3</div>
-            <p class="text-sm text-gray-400 mt-1">Click or press Esc to cancel</p>
+            <p id="noise-calibrate-hint" class="text-sm text-gray-400 mt-1 text-center" style="max-width: 18rem">Click or press Esc to cancel</p>
         </div>
     </div>
 
@@ -3488,8 +3488,10 @@
 
             // dBFS to a 0-100 scale that starts just under the quiet baseline.
             // `range` is the sensitivity: fewer dB from silent to full scale.
+            const FLOOR_UNDER_BASELINE_DB = 4;
+
             function levelFromDb(db, baseline, range) {
-                return clamp(((db - (baseline - 4)) / range) * 100, 0, 100);
+                return clamp(((db - (baseline - FLOOR_UNDER_BASELINE_DB)) / range) * 100, 0, 100);
             }
 
             // Fast attack, slow release, so a burst shows at once and fades gently.
@@ -3546,6 +3548,105 @@
                 return (sorted[middle - 1] + sorted[middle]) / 2;
             }
 
+            // "Tune to room": the sensitivity that puts working voices a few
+            // dB under yellow, so raised voices tip into yellow and shouting
+            // reaches red. The voice readings go through the meter's own
+            // smoothing first, so the tune matches what the meter will show.
+            // Null when the voices weren't clearly louder than the quiet room
+            // (nobody talked, or the mic is too far away).
+            const VOICE_UNDER_YELLOW_DB = 6;
+            const VOICE_MIN_GAP_DB = 6;
+
+            function tunedRange(baseline, voiceSamples, yellowAt, limits) {
+                if (!voiceSamples.length) return null;
+                const smoothed = [];
+                let envelope = voiceSamples[0];
+                voiceSamples.forEach(db => {
+                    envelope = smoothLevel(envelope, db);
+                    smoothed.push(envelope);
+                });
+                const voiceDb = medianOf(smoothed);
+                if (voiceDb - baseline < VOICE_MIN_GAP_DB) return null;
+                const voiceAboveFloor = voiceDb - (baseline - FLOOR_UNDER_BASELINE_DB);
+                const range = ((voiceAboveFloor + VOICE_UNDER_YELLOW_DB) * 100) / yellowAt;
+                return clamp(Math.round(range), limits[0], limits[1]);
+            }
+
+            // The quiet level follows the room (Tom 2026-10-28). When a furnace
+            // or projector fan starts, the room's quietest moments get louder
+            // and the baseline drifts up to match; when it stops, back down.
+            // It watches the quietest tenth of the last 2 minutes, waits for
+            // 30 seconds of readings before moving, rises slowly (a minute to
+            // the cap) and falls faster, and never strays more than 6 dB from
+            // the tuned baseline: a class that stays loud all period can only
+            // nudge it, never teach it that loud is quiet.
+            const QUIET_WINDOW_SECONDS = 120;
+            const QUIET_MIN_SECONDS = 30;
+            const QUIET_PERCENTILE = 0.1;
+            const QUIET_DRIFT_CAP_DB = 6;
+            const QUIET_RISE_DB_PER_SECOND = 0.1;
+            const QUIET_FALL_DB_PER_SECOND = 0.5;
+
+            function createQuietTracker() {
+                let secondMedians = [];
+                let bucket = [];
+                let bucketStart = null;
+                let lastMs = null;
+                let drift = 0;
+                return {
+                    update(db, nowMs, baseline) {
+                        if (bucketStart === null) bucketStart = nowMs;
+                        bucket.push(db);
+                        if (nowMs - bucketStart >= 1000) {
+                            secondMedians.push(medianOf(bucket));
+                            if (secondMedians.length > QUIET_WINDOW_SECONDS) secondMedians.shift();
+                            bucket = [];
+                            bucketStart = nowMs;
+                        }
+                        let deltaSeconds = 0;
+                        if (lastMs !== null) deltaSeconds = (nowMs - lastMs) / 1000;
+                        lastMs = nowMs;
+                        if (secondMedians.length < QUIET_MIN_SECONDS) return drift;
+                        const sorted = [...secondMedians].sort((a, b) => a - b);
+                        const quietFloor = sorted[Math.floor(sorted.length * QUIET_PERCENTILE)];
+                        const target = clamp(quietFloor - baseline, -QUIET_DRIFT_CAP_DB, QUIET_DRIFT_CAP_DB);
+                        if (target > drift) drift = Math.min(target, drift + QUIET_RISE_DB_PER_SECOND * deltaSeconds);
+                        else drift = Math.max(target, drift - QUIET_FALL_DB_PER_SECOND * deltaSeconds);
+                        return drift;
+                    }
+                };
+            }
+
+            // The mic check watches the raw signal for two faults that make
+            // the meter lie: near-total silence (a muted or dead mic) and
+            // clipping (a mic too close to loud sound, or its input level too
+            // high, so every loud moment reads the same). Silence must last
+            // 3 seconds, so a hushed room never trips it; clipping needs a few
+            // clipped readings within 3 seconds and clears after 3 clean ones.
+            const SILENT_BELOW_DB = -90;
+            const CLIPPING_PEAK = 0.98;
+            const MIC_FAULT_MS = 3000;
+            const CLIPS_TO_WARN = 5;
+
+            function createMicCheck() {
+                let silentSince = null;
+                let clipTimes = [];
+                let clipping = false;
+                return {
+                    update(rawDb, peak, nowMs) {
+                        if (rawDb >= SILENT_BELOW_DB) silentSince = null;
+                        else if (silentSince === null) silentSince = nowMs;
+                        if (peak >= CLIPPING_PEAK) clipTimes.push(nowMs);
+                        clipTimes = clipTimes.filter(time => nowMs - time < MIC_FAULT_MS);
+                        if (clipTimes.length >= CLIPS_TO_WARN) clipping = true;
+                        else if (!clipTimes.length) clipping = false;
+                        if (silentSince !== null && nowMs - silentSince >= MIC_FAULT_MS) return 'silent';
+                        if (clipping) return 'clipping';
+                        return 'ok';
+                    }
+                };
+            }
+
             function lookAvailable(look, date, preview) {
                 if (!Object.prototype.hasOwnProperty.call(SEASONAL_LOOKS, look)) return LOOKS.includes(look);
                 return preview || date.getMonth() === SEASONAL_LOOKS[look];
@@ -3573,14 +3674,14 @@
 
             return {
                 SEASONAL_LOOKS, LOOKS, levelFromDb, smoothLevel, zoneFor, createZoneHold,
-                stepWear, medianOf, lookAvailable, resolveLook, statusWord
+                stepWear, medianOf, tunedRange, createQuietTracker, SILENT_BELOW_DB, createMicCheck, lookAvailable, resolveLook, statusWord
             };
         })();
 
         // --- 6.1 Settings (this browser only) ---
         // micId '' means "whatever the computer's default input is".
         const NOISE_DEFAULTS = { yellowAt: 45, redAt: 70, hold: 1.5, range: 42, baseline: -55, changeTime: 15, look: 'bars', micId: '' };
-        const NOISE_LIMITS = { yellowAt: [10, 80], redAt: [20, 95], hold: [0, 5], range: [25, 60], changeTime: [5, 60], baseline: [-120, 0] };
+        const NOISE_LIMITS = { yellowAt: [10, 80], redAt: [20, 95], hold: [0, 5], range: [25, 90], changeTime: [5, 60], baseline: [-120, 0] };
         const NOISE_MIN_GAP = 5;
 
         function loadNoiseSettings() {
@@ -4231,14 +4332,14 @@
             });
         });
 
-        // The baseline lives in the settings box: it's set once per room, so
-        // it doesn't need a button of its own in the controls.
+        // Tuning lives in the settings box: it's done once per room, so it
+        // doesn't need a button of its own in the controls.
         function syncBaselineButton() {
             const micOn = noiseMicOn();
             noiseBaselineButton.disabled = !micOn;
             document.getElementById('noise-baseline-hint').textContent = micOn
-                ? 'Press while the room is quiet. It listens for 3 seconds.'
-                : 'Turn the mic on first, then set the quiet baseline.';
+                ? 'Two steps: 3 seconds of quiet, then 5 seconds of the class talking at working voices.'
+                : 'Turn the mic on first, then tune to the room.';
         }
 
         // Which microphone to listen to (Tom 2026-10-23), for classrooms with
@@ -4279,7 +4380,7 @@
             // the old baseline no longer fits.
             stopNoiseMic();
             startNoiseMic();
-            noiseMicHint.textContent = 'Switched. Set the quiet baseline again for this mic.';
+            noiseMicHint.textContent = 'Switched. Tune to the room again for this mic.';
         });
 
         if (navigator.mediaDevices) {
@@ -4318,44 +4419,98 @@
             }
         });
 
-        // A 3-second "Stay quiet" countdown; the median of what it hears
-        // becomes this room's baseline.
+        // "Tune to room" (Tom 2026-10-28), like a speaker tuning itself to a
+        // room: 3 seconds of quiet set the baseline (the median of what it
+        // hears), then 5 seconds of working voices set the sensitivity. The
+        // quiet level is saved as soon as step 1 ends, so skipping step 2
+        // (no class in the room yet) still leaves a useful baseline.
+        const TUNE_QUIET_SECONDS = 3;
+        const TUNE_VOICE_SECONDS = 5;
+        const noiseCalibrateTitle = document.getElementById('noise-calibrate-title');
+        const noiseCalibrateHint = document.getElementById('noise-calibrate-hint');
         let calibrateTimer = null;
+        let tuneStep = null;
+
+        function runTuneCountdown(seconds, takeSample, whenDone) {
+            const startedAt = Date.now();
+            noiseCountdown.textContent = String(seconds);
+            clearInterval(calibrateTimer);
+            calibrateTimer = setInterval(() => {
+                if (!noiseMicOn()) { cancelCalibration(); return; }
+                const secondsLeft = seconds - (Date.now() - startedAt) / 1000;
+                noiseCountdown.textContent = String(Math.max(1, Math.ceil(secondsLeft)));
+                takeSample();
+                if (secondsLeft > 0) return;
+                clearInterval(calibrateTimer);
+                calibrateTimer = null;
+                whenDone();
+            }, 50);
+        }
 
         function startCalibration() {
             closeNoiseLookMenu();
             if (!noiseMicOn()) {
-                setNoiseNote('Turn the mic on first, then set the quiet baseline.', true);
+                setNoiseNote('Turn the mic on first, then tune to the room.', true);
                 return;
             }
             // Started from inside the settings box: swap one modal for the other.
             hideNoiseModal(noiseSettingsModal, noiseSettingsBox);
             const samples = [];
-            const startedAt = Date.now();
-            noiseCountdown.textContent = '3';
+            const rawSamples = [];
+            tuneStep = 'quiet';
+            noiseCalibrateTitle.textContent = 'Stay quiet';
+            noiseCalibrateHint.textContent = 'Click or press Esc to cancel';
             showNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
             noiseCalibrateBox.focus();
-            clearInterval(calibrateTimer);
-            calibrateTimer = setInterval(() => {
-                if (!noiseMicOn()) { cancelCalibration(); return; }
-                const secondsLeft = 3 - (Date.now() - startedAt) / 1000;
-                noiseCountdown.textContent = String(Math.max(1, Math.ceil(secondsLeft)));
+            runTuneCountdown(TUNE_QUIET_SECONDS, () => {
                 samples.push(readMicDb());
-                if (secondsLeft > 0) return;
-                clearInterval(calibrateTimer);
-                calibrateTimer = null;
+                rawSamples.push(readRawMic().db);
+            }, () => {
+                // A muted mic would save a baseline of near-silence, and then
+                // every whisper would read "Too loud". Keep the old one.
+                if (TimrNoise.medianOf(rawSamples) < TimrNoise.SILENT_BELOW_DB) {
+                    tuneStep = null;
+                    hideNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
+                    setNoiseNote(`Not tuned. ${MIC_FAULTS.silent.note}`, true);
+                    announce('Not tuned. The microphone hears almost nothing.');
+                    return;
+                }
                 noiseSettings.baseline = clampNumber(TimrNoise.medianOf(samples), NOISE_LIMITS.baseline[0], NOISE_LIMITS.baseline[1]);
                 saveNoiseSettings();
+                resetQuietTracker();
+                startVoiceStep();
+            });
+        }
+
+        function startVoiceStep() {
+            const voiceSamples = [];
+            tuneStep = 'voices';
+            noiseCalibrateTitle.textContent = 'Now talk at working voices';
+            noiseCalibrateHint.textContent = 'No class in the room yet? Click or press Esc to skip. The quiet level is already saved.';
+            announce('Quiet level saved. Now talk at working voices for 5 seconds.');
+            runTuneCountdown(TUNE_VOICE_SECONDS, () => voiceSamples.push(readMicDb()), () => {
+                tuneStep = null;
                 hideNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
-                setNoiseNote('Baseline set for this room.');
-                announce('Quiet baseline set.');
-            }, 50);
+                const range = TimrNoise.tunedRange(noiseSettings.baseline, voiceSamples, noiseSettings.yellowAt, NOISE_LIMITS.range);
+                if (range === null) {
+                    setNoiseNote("Quiet level saved, but Timr couldn't hear voices clearly above it, so the sensitivity is unchanged. Try again while the class talks, or move the mic closer.", true);
+                    announce('Voices not heard clearly. Sensitivity unchanged.');
+                    return;
+                }
+                noiseSettings.range = range;
+                saveNoiseSettings();
+                setNoiseNote('Tuned to this room. Working voices now sit just under yellow.');
+                announce('Tuned to this room.');
+            });
         }
 
         function cancelCalibration() {
+            const skippedVoices = tuneStep === 'voices';
+            tuneStep = null;
             clearInterval(calibrateTimer);
             calibrateTimer = null;
             hideNoiseModal(noiseCalibrateModal, noiseCalibrateBox);
+            if (skippedVoices) setNoiseNote('Quiet level saved. Sensitivity unchanged.');
         }
 
         noiseBaselineButton.addEventListener('click', startCalibration);
@@ -4370,7 +4525,33 @@
         let noiseAudioContext = null;
         let noiseAnalyser = null;
         let noiseBuffer = null;
+        // Taps the signal before the voice band, for the mic check: clipping
+        // and dead silence happen at the mic, whatever the pitch.
+        let noiseRawAnalyser = null;
+        let noiseRawBuffer = null;
+        let noiseMicCheck = TimrNoise.createMicCheck();
+        let noiseMicFault = 'ok';
+        // dB the quiet level has followed the room, on top of the saved
+        // baseline. Never saved: each mic session starts from the tune.
+        let noiseQuietTracker = TimrNoise.createQuietTracker();
+        let noiseQuietDrift = 0;
         let noiseMicStarting = false;
+
+        function resetQuietTracker() {
+            noiseQuietTracker = TimrNoise.createQuietTracker();
+            noiseQuietDrift = 0;
+        }
+
+        const MIC_FAULTS = {
+            silent: {
+                note: 'The mic hears almost nothing. Check it isn\'t muted (a mute key or switch, or the computer\'s sound settings), and that the right mic is picked in Settings (the gear).',
+                spoken: 'The microphone hears almost nothing.'
+            },
+            clipping: {
+                note: 'The mic is overloading, so loud moments all read the same. Move it away from loud spots and speakers, or lower its input level in the computer\'s sound settings.',
+                spoken: 'The microphone is overloading.'
+            }
+        };
 
         function noiseMicOn() {
             return Boolean(noiseAnalyser);
@@ -4387,6 +4568,11 @@
             syncBaselineButton();
             updateIslandPill();
         }
+
+        // The meter listens to the voice band only: two cuts under 200 Hz
+        // (mains hum, furnace, projector fans) and two over 4 kHz (hiss).
+        // Children's and adults' voices sit in between.
+        const VOICE_BAND_FILTERS = [['highpass', 200], ['highpass', 200], ['lowpass', 4000], ['lowpass', 4000]];
 
         async function startNoiseMic() {
             if (noiseMicStarting || noiseMicOn()) return;
@@ -4413,17 +4599,33 @@
                 const audioContext = new AudioContextClass();
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 2048;
-                audioContext.createMediaStreamSource(stream).connect(analyser);
+                const voiceBand = VOICE_BAND_FILTERS.map(([type, frequency]) => {
+                    const filter = audioContext.createBiquadFilter();
+                    filter.type = type;
+                    filter.frequency.value = frequency;
+                    filter.Q.value = Math.SQRT1_2;
+                    return filter;
+                });
+                const source = audioContext.createMediaStreamSource(stream);
+                [source, ...voiceBand, analyser].reduce((fromNode, toNode) => fromNode.connect(toNode));
+                const rawAnalyser = audioContext.createAnalyser();
+                rawAnalyser.fftSize = 2048;
+                source.connect(rawAnalyser);
                 if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
                 noiseStream = stream;
                 noiseAudioContext = audioContext;
                 noiseAnalyser = analyser;
                 noiseBuffer = new Float32Array(analyser.fftSize);
+                noiseRawAnalyser = rawAnalyser;
+                noiseRawBuffer = new Float32Array(rawAnalyser.fftSize);
+                noiseMicCheck = TimrNoise.createMicCheck();
+                noiseMicFault = 'ok';
+                resetQuietTracker();
                 // A USB mic pulled out mid-lesson ends its track. Without this
                 // the meter would sit on silence reading "Working voices".
                 stream.getAudioTracks().forEach(track => track.addEventListener('ended', handleMicDisconnected));
                 showMicState();
-                setNoiseNote('Listening. For a better reading, open the settings (the gear) and set a quiet baseline.');
+                setNoiseNote('Listening. For a better reading, open the settings (the gear) and tune to the room.');
                 announce('Microphone on. Nothing is recorded, and no sound leaves this computer.');
                 // The voice bar counts as voice-bar-on when its button is pressed.
                 if (isNoiseMode) countOncePerDay('noise-meter-on');
@@ -4461,6 +4663,9 @@
             noiseAudioContext = null;
             noiseAnalyser = null;
             noiseBuffer = null;
+            noiseRawAnalyser = null;
+            noiseRawBuffer = null;
+            noiseMicFault = 'ok';
             showMicState();
             setNoiseNote(DEMO_NOTE);
             if (wasOn) announce('Microphone off.');
@@ -4477,12 +4682,39 @@
             else stopNoiseMic();
         });
 
+        function bufferDb(buffer) {
+            let sumOfSquares = 0;
+            for (let index = 0; index < buffer.length; index++) sumOfSquares += buffer[index] * buffer[index];
+            const rms = Math.sqrt(sumOfSquares / buffer.length);
+            return 20 * Math.log10(Math.max(rms, 1e-7));
+        }
+
         function readMicDb() {
             noiseAnalyser.getFloatTimeDomainData(noiseBuffer);
-            let sumOfSquares = 0;
-            for (let index = 0; index < noiseBuffer.length; index++) sumOfSquares += noiseBuffer[index] * noiseBuffer[index];
-            const rms = Math.sqrt(sumOfSquares / noiseBuffer.length);
-            return 20 * Math.log10(Math.max(rms, 1e-7));
+            return bufferDb(noiseBuffer);
+        }
+
+        function readRawMic() {
+            noiseRawAnalyser.getFloatTimeDomainData(noiseRawBuffer);
+            let peak = 0;
+            for (let index = 0; index < noiseRawBuffer.length; index++) peak = Math.max(peak, Math.abs(noiseRawBuffer[index]));
+            return { db: bufferDb(noiseRawBuffer), peak };
+        }
+
+        // Shows a mic fault when it starts and says so when it clears. Under
+        // a timer the warning shows in the voice bar's note line too.
+        function checkMic(nowMs) {
+            const raw = readRawMic();
+            const fault = noiseMicCheck.update(raw.db, raw.peak, nowMs);
+            if (fault === noiseMicFault) return;
+            noiseMicFault = fault;
+            if (fault === 'ok') {
+                setNoiseNote('The mic is hearing the room properly again.');
+                announce('Microphone is working again.');
+                return;
+            }
+            setNoiseNote(MIC_FAULTS[fault].note, true);
+            announce(MIC_FAULTS[fault].spoken);
         }
 
         // Demo classroom until the mic is on: quiet work, table talk, rowdy
@@ -4523,10 +4755,14 @@
                 noiseStripStatus.textContent = '';
                 return;
             }
+            if (micOn) checkMic(nowMs);
             const rawDb = micOn ? readMicDb() : readDemoDb(nowMs);
+            // Tuning measures the room itself, so the quiet level holds still
+            // while it runs.
+            if (micOn && !tuneStep) noiseQuietDrift = noiseQuietTracker.update(rawDb, nowMs, noiseSettings.baseline);
             // The demo always uses the default baseline, so a calibrated room
             // doesn't make the demo look silent.
-            const baseline = micOn ? noiseSettings.baseline : NOISE_DEFAULTS.baseline;
+            const baseline = micOn ? noiseSettings.baseline + noiseQuietDrift : NOISE_DEFAULTS.baseline;
             const level = TimrNoise.levelFromDb(rawDb, baseline, noiseSettings.range);
             noiseSmooth = TimrNoise.smoothLevel(noiseSmooth, level);
             const zone = TimrNoise.zoneFor(noiseSmooth, noiseSettings.yellowAt, noiseSettings.redAt);
@@ -4652,7 +4888,10 @@
             return noiseMicOn() ? 'Voice level · Listening' : 'Voice level · Demo';
         }
 
-        window.TimrNoise = { ...TimrNoise, isMicOn: noiseMicOn };
+        window.TimrNoise = { ...TimrNoise, isMicOn: noiseMicOn, readMicDb: () => {
+            if (!noiseMicOn()) return null;
+            return readMicDb();
+        }, quietDrift: () => noiseQuietDrift };
 
         paintNoiseZones();
         drawNoiseFace(0);

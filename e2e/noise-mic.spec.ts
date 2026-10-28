@@ -18,6 +18,7 @@ async function openNoiseWithTone(page: Page, gain: number) {
       oscillator.connect(volume).connect(destination);
       oscillator.start();
       (window as any).__toneVolume = volume;
+      (window as any).__toneOscillator = oscillator;
       (window as any).__toneStream = destination.stream;
       return destination.stream;
     };
@@ -63,17 +64,119 @@ test("a quiet room reads green and a loud one turns the screen red", async ({ pa
   await expect(page.locator("#sr-status")).toHaveText("Too loud");
 });
 
-test("the quiet baseline counts down and saves what the mic heard", async ({ page }) => {
-  await openNoiseWithTone(page, 0.01); // about -43 dBFS
+test("the meter hears voices and tunes out hum and hiss", async ({ page }) => {
+  await openNoiseWithTone(page, 0.1); // about -23 dBFS before the voice band
+  const readingAt = async (frequency: number) => {
+    await page.evaluate((toneFrequency) => {
+      (window as any).__toneOscillator.frequency.value = toneFrequency;
+    }, frequency);
+    // Let the filters settle and the analyser refill on the new tone.
+    await page.waitForTimeout(400);
+    return page.evaluate(() => (window as any).TimrNoise.readMicDb() as number);
+  };
+  const voice = await readingAt(440);
+  const hum = await readingAt(60);
+  const hiss = await readingAt(12000);
+  expect(voice).toBeGreaterThan(-25);
+  expect(hum).toBeLessThan(voice - 30);
+  expect(hiss).toBeLessThan(voice - 30);
+
+  // The same hum that would have been loud now leaves the room green.
+  await expect(page.locator("#noise-stage")).toHaveAttribute("data-zone", "green", { timeout: 4000 });
+});
+
+test("a muted mic gets a warning, which clears when sound comes back", async ({ page }) => {
+  await openNoiseWithTone(page, 0); // exact silence, like a muted mic
+  await expect(page.locator("#noise-note")).toContainText("hears almost nothing", { timeout: 5000 });
+  await expect(page.locator("#noise-note")).toHaveClass(/is-warning/);
+  await expect(page.locator("#sr-status")).toHaveText("The microphone hears almost nothing.");
+
+  await page.evaluate(() => { (window as any).__toneVolume.gain.value = 0.001; });
+  await expect(page.locator("#noise-note")).toHaveText("The mic is hearing the room properly again.", { timeout: 2000 });
+  await expect(page.locator("#noise-note")).not.toHaveClass(/is-warning/);
+});
+
+test("an overloaded mic gets a warning", async ({ page }) => {
+  await openNoiseWithTone(page, 1.2); // past full scale, so every peak clips
+  await expect(page.locator("#noise-note")).toContainText("overloading", { timeout: 3000 });
+  await expect(page.locator("#noise-note")).toHaveClass(/is-warning/);
+});
+
+test("a muted mic can't be tuned", async ({ page }) => {
+  await openNoiseWithTone(page, 0);
   await page.locator("#island").hover();
   await page.locator("#btn-noise-settings").click();
   await page.locator("#btn-noise-baseline").click();
-  await expect(page.locator("#noise-calibrate-box")).toBeVisible();
-  await expect(page.locator("#noise-note")).toHaveText("Baseline set for this room.", { timeout: 6000 });
+  await expect(page.locator("#noise-note")).toContainText("Not tuned", { timeout: 6000 });
+  await expect(page.locator("#noise-calibrate-modal")).toBeHidden();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));
+  expect(saved.baseline ?? -55).toBe(-55);
+});
+
+test("tuning step 1 saves the quiet level, and skipping step 2 keeps it", async ({ page }) => {
+  await openNoiseWithTone(page, 0.01); // about -43 dBFS
+  await page.locator("#island").hover();
+  await page.locator("#btn-noise-settings").click();
+  await expect(page.locator("#btn-noise-baseline")).toHaveText("Tune to room");
+  await page.locator("#btn-noise-baseline").click();
+  await expect(page.locator("#noise-calibrate-title")).toHaveText("Stay quiet");
+  await expect(page.locator("#noise-calibrate-title")).toHaveText("Now talk at working voices", { timeout: 5000 });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#noise-calibrate-modal")).toBeHidden();
+  await expect(page.locator("#noise-note")).toHaveText("Quiet level saved. Sensitivity unchanged.");
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));
   // A sine at amplitude 0.01 has an RMS of 0.00707, which is -43 dBFS.
   expect(saved.baseline).toBeGreaterThan(-46);
   expect(saved.baseline).toBeLessThan(-40);
+  expect(saved.range).toBe(42);
+});
+
+test("tune to room: working voices land in green, raised voices in yellow", async ({ page }) => {
+  await openNoiseWithTone(page, 0.001); // the quiet room, about -63 dBFS
+  await page.locator("#island").hover();
+  await page.locator("#btn-noise-settings").click();
+  await page.locator("#btn-noise-baseline").click();
+  await expect(page.locator("#noise-calibrate-title")).toHaveText("Now talk at working voices", { timeout: 5000 });
+  await page.evaluate(() => { (window as any).__toneVolume.gain.value = 0.02; }); // working voices, about -37 dBFS
+  await expect(page.locator("#noise-note")).toHaveText("Tuned to this room. Working voices now sit just under yellow.", { timeout: 8000 });
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));
+  // 26 dB from quiet to voices: (26 + 4 + 6) * 100 / 45 is 80.
+  expect(saved.range).toBeGreaterThanOrEqual(77);
+  expect(saved.range).toBeLessThanOrEqual(83);
+  await expect(page.locator("#noise-stage")).toHaveAttribute("data-zone", "green", { timeout: 4000 });
+
+  await page.evaluate(() => { (window as any).__toneVolume.gain.value = 0.07; }); // raised voices, about 11 dB up
+  await expect(page.locator("#noise-stage")).toHaveAttribute("data-zone", "yellow", { timeout: 5000 });
+});
+
+test("tune to room keeps the old sensitivity when no voices are heard", async ({ page }) => {
+  await openNoiseWithTone(page, 0.001);
+  await page.locator("#island").hover();
+  await page.locator("#btn-noise-settings").click();
+  await page.locator("#btn-noise-baseline").click();
+  await expect(page.locator("#noise-note")).toContainText("couldn't hear voices clearly", { timeout: 10000 });
+  await expect(page.locator("#noise-note")).toHaveClass(/is-warning/);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));
+  expect(saved.range).toBe(42);
+});
+
+test("the live meter's quiet level starts following a steady hum after 30 s", async ({ page }) => {
+  // A fake clock runs 45 s of meter ticks in about 20 s of real time. The
+  // full climb to the 6 dB cap is covered by the maths test in noise.spec.ts
+  // (3 fake minutes here took 1.6 real minutes).
+  test.setTimeout(90_000);
+  await page.clock.install();
+  await openNoiseWithTone(page, 0.01); // -43 dBFS, 12 dB over the default -55 baseline
+  await page.clock.runFor(25_000);
+  expect(await page.evaluate(() => (window as any).TimrNoise.quietDrift())).toBe(0);
+  await page.clock.runFor(20_000);
+  // 30 s to start, then 0.1 dB a second for about 15 s.
+  const drift = await page.evaluate(() => (window as any).TimrNoise.quietDrift());
+  expect(drift).toBeGreaterThan(1);
+  expect(drift).toBeLessThan(2);
+  // The saved baseline is untouched: the drift lasts only while the mic is on.
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));
+  expect(saved.baseline ?? -55).toBe(-55);
 });
 
 test("Escape cancels the quiet baseline without saving one", async ({ page }) => {
@@ -238,7 +341,7 @@ test("picking a mic lists real inputs only, switches to it live, and is remember
   expect(switched.deviceId).toEqual({ ideal: "usb-1" });
   // Browser processing stays off on the new mic too.
   expect(switched.autoGainControl).toBe(false);
-  await expect(page.locator("#noise-mic-hint")).toContainText("Set the quiet baseline again");
+  await expect(page.locator("#noise-mic-hint")).toContainText("Tune to the room again");
   await expect(page.locator("#noise-mic-label")).toHaveText("Mic on · nothing recorded");
 
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("classtimr-noise") || "{}"));

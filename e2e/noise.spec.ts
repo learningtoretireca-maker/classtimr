@@ -113,6 +113,94 @@ test.describe("Noise mode maths", () => {
     expect(medians[2]).toBeNull();
   });
 
+  test("tune to room puts working voices 6 dB under yellow, within the slider's range", async ({ page }) => {
+    const ranges = await page.evaluate(() => {
+      const noise = (window as any).TimrNoise;
+      const limits = [25, 90];
+      return {
+        typical: noise.tunedRange(-60, Array(100).fill(-40), 45, limits), // (20 + 4 + 6) * 100 / 45
+        tooClose: noise.tunedRange(-60, Array(100).fill(-57), 45, limits), // nobody talked
+        veryLoud: noise.tunedRange(-60, Array(100).fill(-10), 45, limits), // clamps at the top
+        empty: noise.tunedRange(-60, [], 45, limits),
+        // Voices land where the meter will show them: 6 dB under yellow.
+        landsAt: noise.levelFromDb(-40, -60, noise.tunedRange(-60, Array(100).fill(-40), 45, limits))
+      };
+    });
+    expect(ranges.typical).toBe(67);
+    expect(ranges.tooClose).toBeNull();
+    expect(ranges.veryLoud).toBe(90);
+    expect(ranges.empty).toBeNull();
+    expect(ranges.landsAt).toBeGreaterThan(34);
+    expect(ranges.landsAt).toBeLessThan(37);
+  });
+
+  test("quiet level: follows a furnace up to the 6 dB cap, slowly, and back down", async ({ page }) => {
+    const result = await page.evaluate(() => {
+      const noise = (window as any).TimrNoise;
+      const tracker = noise.createQuietTracker();
+      let time = 0;
+      // A reading every 100 ms for `seconds`, against a -60 dB tuned baseline.
+      const run = (db: number, seconds: number) => {
+        let drift = 0;
+        for (const end = time + seconds * 1000; time < end; time += 100) drift = tracker.update(db, time, -60);
+        return drift;
+      };
+      const quietRoom = run(-60, 40);
+      const oneLoudMinute = run(-50, 60); // a loud minute is not a new quiet level
+      const furnaceOn = run(-50, 200); // 10 dB louder, capped at 6
+      const furnaceOff = run(-60, 40);
+      const allPeriodLoud = run(-30, 300); // 30 dB louder can still only nudge it
+      const quieterRoom = noise.createQuietTracker();
+      let quietTime = 0;
+      let fallsTo = 0;
+      for (; quietTime < 200000; quietTime += 100) fallsTo = quieterRoom.update(-70, quietTime, -60);
+      const waits = noise.createQuietTracker();
+      let waitTime = 0;
+      let early = 0;
+      for (; waitTime < 25000; waitTime += 100) early = waits.update(-40, waitTime, -60);
+      return { quietRoom, oneLoudMinute, furnaceOn, furnaceOff, allPeriodLoud, fallsTo, early };
+    });
+    expect(result.quietRoom).toBe(0);
+    expect(result.oneLoudMinute).toBe(0);
+    expect(result.furnaceOn).toBeCloseTo(6);
+    expect(result.furnaceOff).toBeCloseTo(0);
+    expect(result.allPeriodLoud).toBeCloseTo(6);
+    expect(result.fallsTo).toBeCloseTo(-6);
+    expect(result.early).toBe(0);
+  });
+
+  test("mic check: silence must last 3 s, and a hushed room never counts", async ({ page }) => {
+    const result = await page.evaluate(() => {
+      const noise = (window as any).TimrNoise;
+      const muted = noise.createMicCheck();
+      const atStart = muted.update(-140, 0, 0);
+      const justBefore = muted.update(-140, 0, 2900);
+      const atThree = muted.update(-140, 0, 3000);
+      const soundBack = muted.update(-60, 0.05, 3100);
+
+      const hushed = noise.createMicCheck();
+      let hushedResult = "ok";
+      for (let time = 0; time <= 10000; time += 100) hushedResult = hushed.update(-75, 0.001, time);
+      return { atStart, justBefore, atThree, soundBack, hushedResult };
+    });
+    expect(result).toEqual({ atStart: "ok", justBefore: "ok", atThree: "silent", soundBack: "ok", hushedResult: "ok" });
+  });
+
+  test("mic check: one clip is fine, repeated clipping warns, 3 clean seconds clear it", async ({ page }) => {
+    const result = await page.evaluate(() => {
+      const noise = (window as any).TimrNoise;
+      const check = noise.createMicCheck();
+      const oneClip = check.update(-10, 1, 0);
+      const afterOne = check.update(-30, 0.3, 100);
+      let repeated = "ok";
+      for (let time = 200; time <= 600; time += 100) repeated = check.update(-5, 1, time);
+      const stillClose = check.update(-30, 0.3, 3000);
+      const cleared = check.update(-30, 0.3, 3700);
+      return { oneClip, afterOne, repeated, stillClose, cleared };
+    });
+    expect(result).toEqual({ oneClip: "ok", afterOne: "ok", repeated: "clipping", stillClose: "clipping", cleared: "ok" });
+  });
+
   test("seasonal looks only show in their month, or with #preview", async ({ page }) => {
     const seasons = await page.evaluate(() => {
       const noise = (window as any).TimrNoise;
