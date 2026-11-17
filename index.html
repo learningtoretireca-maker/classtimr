@@ -496,6 +496,43 @@
         @media (prefers-reduced-motion: reduce) {
             .noise-status, .noise-seg, .noise-strip-status { transition: none; }
         }
+
+        /* What's new: a small card in the bottom-right corner, same panel
+           and button look as the modals. Shown only while the island is
+           open and nothing is running (section 7). */
+        #whats-new {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 40;
+            width: min(22rem, calc(100vw - 2rem));
+            padding: 1rem 1.25rem;
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            color: #fff;
+            animation: whats-new-in 220ms ease-out;
+        }
+        #whats-new-heading { margin: 0; font-size: 0.875rem; font-weight: 600; letter-spacing: 0.025em; }
+        #whats-new-list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+        .whats-new-title { margin: 0; font-size: 0.875rem; font-weight: 600; }
+        .whats-new-body { margin: 0.125rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: #d1d5db; }
+        .whats-new-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+        #whats-new-done { padding: 0.5rem 1.25rem; border: none; border-radius: 0.75rem; background: #9333ea; color: #fff; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+        #whats-new-done:hover { background: #a855f7; }
+        #whats-new-done:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
+        @keyframes whats-new-in {
+            from { opacity: 0; transform: translateY(0.5rem); }
+            to { opacity: 1; transform: none; }
+        }
+        @keyframes whats-new-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #whats-new { animation: whats-new-fade 150ms ease-out; }
+        }
     </style>
 </head>
 <body class="text-white select-none">
@@ -727,12 +764,37 @@
             <p class="text-sm text-gray-300"><strong class="font-semibold text-white">Daily tallies.</strong> Each day, Timr adds one to a tally in Classhelpr's database at Supabase, in Canada (Montreal), the first time a browser opens it. It does the same the first time that browser starts a timer or the stopwatch, shows the clock, turns on the voice meter or voice bar, picks a theme, goes full screen or pops the timer out, and when a countdown reaches zero. A tally is a date, the action and a number. It holds no name, no device details and nothing about who. No cookie is set for it. Your browser remembers the date it was last counted, so Timr counts each browser once per day, week and month. That date never leaves your browser.</p>
             <p class="text-sm text-gray-300"><strong class="font-semibold text-white">The microphone's sound never leaves your computer.</strong> Timr listens in memory and never records, stores or sends it.</p>
             <p class="text-sm text-gray-300">Do Not Track and Global Privacy Control stop the tallies, and so does opening timr.classhelpr.com/?nocount=1.</p>
+            <p class="text-sm text-gray-300"><strong class="font-semibold text-white">New in Timr.</strong> When Timr gets something new, a small card says so. Your browser remembers the last one you closed with Got it, so it doesn't come back. That never leaves your browser.</p>
             <div class="flex w-full mt-1">
                 <button id="privacy-done" type="button" class="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] transition">Done</button>
             </div>
         </div>
     </div>
 
+    <!-- What's new. Filled and shown from section 7; never a dialog, never
+         takes focus. -->
+    <section id="whats-new" aria-labelledby="whats-new-heading" hidden>
+        <h2 id="whats-new-heading">New in Timr</h2>
+        <ul id="whats-new-list"></ul>
+        <div class="whats-new-actions">
+            <button id="whats-new-done" type="button">Got it</button>
+        </div>
+    </section>
+
+    <script>
+        // For What's new (section 7): has this browser used Timr before? Read
+        // here, ahead of every other script, because the noise block saves
+        // classtimr-noise on every load, first visit included. The keys are
+        // a picked theme, Voice level settings and the daily-tally note.
+        const usedTimrBeforeThisLoad = (() => {
+            try {
+                return ['classtimr-theme', 'classtimr-noise', 'classtimr:usage']
+                    .some(key => localStorage.getItem(key) !== null);
+            } catch (e) {
+                return false;
+            }
+        })();
+    </script>
     <script>
         // --- 0. DAILY TALLIES ---
         // Anonymous usage counts for the whole suite (Tom 2026-10-26), on the
@@ -1487,6 +1549,7 @@
             if (!customModal.classList.contains('hidden')) return;
             if (!privacyModal.classList.contains('hidden')) return;
             if (noiseHoldsIsland()) return;
+            if (whatsNewHoldsIsland()) return;
             morphIsland(() => island.classList.remove('is-expanded'));
             controlBar.inert = true;
             islandPill.setAttribute('aria-expanded', 'false');
@@ -1524,6 +1587,9 @@
         // mouseleave to lean on).
         document.addEventListener('pointerdown', (e) => {
             if (!isIslandExpanded() || island.contains(e.target)) return;
+            // The What's new card shows only while the island is open, so a
+            // tap on Got it must not fold the island (and the card) first.
+            if (whatsNewCard.contains(e.target)) return;
             if (island.contains(document.activeElement)) document.activeElement.blur();
             collapseIsland();
         });
@@ -4929,6 +4995,204 @@
         setNoiseLook(TimrNoise.resolveLook(noiseSettings.look, new Date(), isNoisePreview()));
         setInterval(refreshNoiseLooks, 60000);
         window.addEventListener('hashchange', refreshNoiseLooks);
+    </script>
+    <script>
+        // --- 7. WHAT'S NEW ---
+        // A small card in the corner that tells a returning teacher what
+        // changed since they last looked. Which entries it holds is decided
+        // once, on page load, and never again in the session. It stays until
+        // they press Got it.
+        //
+        // Timr is projected in front of a class, so the card is on screen only
+        // while the island is open (the teacher is at the controls) and
+        // nothing is running: no countdown or stopwatch, no live mic, no full
+        // screen. The moment any of that changes it hides, and it comes back
+        // when the teacher next opens the controls with nothing running, until
+        // Got it. Runs after the other scripts, so it shares their globals
+        // (island, isIslandExpanded, isRunning, noiseMicOn, scheduleCollapse,
+        // and usedTimrBeforeThisLoad from the small script before section 0).
+
+        const TimrWhatsNew = (() => {
+            /**
+             * What's new in Timr, newest first. The card shows a teacher every entry
+             * newer than the last one they dismissed, three at most.
+             *
+             * WHEN A CHANGE GETS AN ENTRY — the bar is "would a teacher notice?":
+             *   - yes: a new feature or a new button
+             *   - yes: something a teacher uses moved, was renamed, or was taken away
+             *   - yes: something now behaves differently from what they'd expect
+             *   - no:  bug fixes, speed, spacing and wording tweaks, security and
+             *          dependency updates, anything behind the scenes
+             * When in doubt, leave it out. A card every week teaches people to close it
+             * unread.
+             *
+             * HOW TO WRITE ONE:
+             *   - id is the date it ships plus a short slug, "YYYY-MM-DD-slug". The card
+             *     compares ids as text, so the date must lead and must be zero-padded,
+             *     and the list must be in descending id order — two entries on the same
+             *     day go by slug, z before a. The test fails if the order is wrong.
+             *   - title: a few words naming the thing, the way it reads on screen.
+             *   - body: one or two plain sentences — what it is and where to find it.
+             *     Name the button exactly as it is labelled.
+             */
+            const ENTRIES = [
+                {
+                    id: '2026-10-28-tune-to-room',
+                    title: 'Tune to room',
+                    body: 'Voice level can set itself to your class. With the mic on, press the gear button, then Tune to room: 3 seconds of quiet, then 5 seconds of working voices.'
+                },
+                {
+                    id: '2026-10-23-voice-level',
+                    title: 'Voice level',
+                    body: 'Press Voice level, next to Themes, to show how loud the room is as bars, a face or a seasonal picture. Press Use mic to start; Timr never records or sends the sound.'
+                },
+                {
+                    id: '2026-10-23-voice-bar',
+                    title: 'Voice bar',
+                    body: 'Press Voice bar to put a slim loudness meter under the timer, stopwatch or clock. It goes into the pop-out with the timer too.'
+                }
+            ];
+
+            // The id of the newest entry this browser has dismissed.
+            const SEEN_KEY = 'classtimr:whats-new-seen';
+            // More than this and the card is a changelog, not a heads-up.
+            const MAX_SHOWN = 3;
+            const ENTRY_ID_PATTERN = /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/;
+
+            // What the card should show, from what is known, kept free of the
+            // DOM so the e2e tests can check the rules directly.
+            //   - A browser that cannot remember a dismissal shows nothing:
+            //     otherwise the card would come back on every page load.
+            //   - A first visit shows nothing and quietly marks everything
+            //     seen. Someone who has never used Timr has nothing to compare
+            //     "new" against.
+            //   - A teacher who has used Timr but has no record of the card
+            //     (the first deploy that carries it) sees the current list.
+            //   - Otherwise, every entry newer than the one they dismissed.
+            function decide({ entries, seenId, hasUsedTimr, canPersist }) {
+                const newest = entries[0];
+                if (!newest || !canPersist) return { show: [], markSeen: null };
+                if (seenId === null && !hasUsedTimr) return { show: [], markSeen: newest.id };
+                const unseen = entries.filter(entry => seenId === null || entry.id > seenId);
+                return { show: unseen.slice(0, MAX_SHOWN), markSeen: null };
+            }
+
+            return { ENTRIES, SEEN_KEY, MAX_SHOWN, ENTRY_ID_PATTERN, decide };
+        })();
+
+        // For the e2e tests, like window.TimrNoise.
+        window.TimrWhatsNew = TimrWhatsNew;
+
+        const whatsNewCard = document.getElementById('whats-new');
+        const whatsNewList = document.getElementById('whats-new-list');
+        const whatsNewDone = document.getElementById('whats-new-done');
+        // Decided once below; emptied by Got it.
+        let whatsNewEntries = [];
+
+        function canPersistLocal() {
+            try {
+                const probe = 'classtimr:probe';
+                localStorage.setItem(probe, '1');
+                localStorage.removeItem(probe);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function readWhatsNewSeen() {
+            try {
+                return localStorage.getItem(TimrWhatsNew.SEEN_KEY);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function writeWhatsNewSeen(id) {
+            try {
+                localStorage.setItem(TimrWhatsNew.SEEN_KEY, id);
+            } catch (e) {
+                // Storage refused: the card still closes for this session.
+            }
+        }
+
+        // Safe to show only with the teacher at the controls and nothing on
+        // the board moving: island open, no countdown or stopwatch running,
+        // no live mic, not in full screen.
+        function whatsNewMayShow() {
+            if (whatsNewEntries.length === 0) return false;
+            if (!isIslandExpanded()) return false;
+            if (isRunning) return false;
+            if (noiseMicOn()) return false;
+            if (document.fullscreenElement) return false;
+            return true;
+        }
+
+        function syncWhatsNew() {
+            const shouldShow = whatsNewMayShow();
+            if (whatsNewCard.hidden === !shouldShow) return;
+            whatsNewCard.hidden = !shouldShow;
+        }
+
+        // collapseIsland asks this before folding the controls away, so the
+        // card doesn't vanish from under the pointer or a keyboard user.
+        function whatsNewHoldsIsland() {
+            if (whatsNewCard.hidden) return false;
+            return whatsNewCard.matches(':hover') || Boolean(whatsNewCard.querySelector(':focus-visible'));
+        }
+
+        function dismissWhatsNew() {
+            writeWhatsNewSeen(TimrWhatsNew.ENTRIES[0].id);
+            whatsNewEntries = [];
+            syncWhatsNew();
+            scheduleCollapse(250);
+        }
+
+        function fillWhatsNew(entries) {
+            whatsNewList.replaceChildren(...entries.map(entry => {
+                const item = document.createElement('li');
+                const title = document.createElement('p');
+                title.className = 'whats-new-title';
+                title.textContent = entry.title;
+                const body = document.createElement('p');
+                body.className = 'whats-new-body';
+                body.textContent = entry.body;
+                item.append(title, body);
+                return item;
+            }));
+        }
+
+        whatsNewDone.addEventListener('click', dismissWhatsNew);
+        // Like the island itself: leaving the card lets the controls fold.
+        whatsNewCard.addEventListener('mouseleave', () => scheduleCollapse(250));
+        whatsNewCard.addEventListener('focusout', (e) => {
+            if (!whatsNewCard.contains(e.relatedTarget) && !island.contains(e.relatedTarget)) scheduleCollapse(250);
+        });
+
+        // The island repaints on every change that matters here: open or
+        // folded, play or pause, mode, mic on or off. Watching it is one hook
+        // instead of one in each of those places. Full screen is the browser's.
+        new MutationObserver(syncWhatsNew).observe(island, {
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'],
+            childList: true,
+            characterData: true
+        });
+        document.addEventListener('fullscreenchange', syncWhatsNew);
+
+        (() => {
+            const decision = TimrWhatsNew.decide({
+                entries: TimrWhatsNew.ENTRIES,
+                seenId: readWhatsNewSeen(),
+                hasUsedTimr: usedTimrBeforeThisLoad,
+                canPersist: canPersistLocal()
+            });
+            if (decision.markSeen) writeWhatsNewSeen(decision.markSeen);
+            whatsNewEntries = decision.show;
+            fillWhatsNew(whatsNewEntries);
+            syncWhatsNew();
+        })();
     </script>
 </body>
 </html>
